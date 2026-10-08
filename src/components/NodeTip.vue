@@ -2,7 +2,7 @@
 // 滑過節點時顯示的詳細資訊
 import { computed, onBeforeUnmount, onUpdated, ref, watch } from 'vue'
 import { NODE_RISK, VULNS, VULN_RISK, recaptureTurnsOf, repairTurnsOf } from '../game/data'
-import { etaOf, reachKnown, recaptureBlock, repairBlock, speedOf } from '../game/engine'
+import { etaOf, isImpregnable, reachKnown, recaptureBlock, repairBlock, speedOf } from '../game/engine'
 import { game, nodeRect, ui, view } from '../game/store'
 import type { VulnId } from '../game/types'
 import Icon from './Icon.vue'
@@ -53,10 +53,13 @@ const ABILITY: Record<string, { icon: string; text: string }> = {
   backup: { icon: 'crown', text: '多數任務的關鍵' },
 }
 
+// 完全沒有弱點、而且已經被偵查牌翻過：其中一格是「無懈可擊」
+const wall = computed(() => !!node.value && node.value.sealed && isImpregnable(node.value) && node.value.slots.some((sl) => sl.vis === 0))
+
 const rows = computed(() => {
   const n = node.value
   if (!n) return []
-  return n.slots
+  const list = n.slots
     .filter((sl) => sl.vis > 0)
     .map((sl) => {
       const d = VULNS[sl.vuln]
@@ -75,6 +78,10 @@ const rows = computed(() => {
           : `公開後約 ${repairTurnsOf(sl.vuln)} 回合會被修復`
       return { kind: 'vuln' as const, name: d.name, icon: d.icon, text: d.desc, rule: d.rule ?? '', vis: sl.vis, risk, eta }
     })
+  if (wall.value) {
+    list.push({ kind: 'shield' as const, name: '無懈可擊', icon: 'shield-check', text: '這個節點沒有任何可利用的弱點', rule: '', vis: 1 as const, risk: '', eta: '' })
+  }
+  return list
 })
 const dots = (k: number) => '●'.repeat(k) + '○'.repeat(3 - k)
 const speed = computed(() => (game.s ? speedOf(game.s) : 1))
@@ -88,7 +95,7 @@ const nodeRisk = computed(() => {
   if (n.controlled) return { base, text: cFrozen.value ? '奪回倒數暫停中' : `公司約 ${etaOf(n.timer, speed.value)} 回合後奪回` }
   return { base, text: `控制後，公司約 ${recaptureTurnsOf(n.role)} 回合會奪回` }
 })
-const hidden = computed(() => node.value?.slots.filter((s) => s.vis === 0).length ?? 0)
+const hidden = computed(() => (node.value?.slots.filter((s) => s.vis === 0).length ?? 0) - (wall.value ? 1 : 0))
 const excluded = computed(() => (node.value ? (Object.keys(node.value.excluded) as VulnId[]) : []))
 const locked = computed(() => {
   const n = node.value
@@ -128,7 +135,7 @@ const locked = computed(() => {
         <Icon :name="r.vis === 2 ? 'eye' : 'ghost'" :size="16" :stroke="2.4" />{{ r.vis === 2 ? '公開' : '隱密' }}
       </span>
     </div>
-    <div v-if="node.sealed && hidden" class="hid">已確認：這裡沒有更多可用的弱點</div>
+    <div v-if="node.sealed && hidden && !wall" class="hid">已確認：這裡沒有更多可用的弱點</div>
     <div v-else-if="hidden" class="hid">還有 {{ hidden }} 張蓋著的牌</div>
     <div v-if="excluded.length" class="exl">
       <span>已排除</span>

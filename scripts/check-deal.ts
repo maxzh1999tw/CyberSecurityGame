@@ -19,10 +19,10 @@ const needs: Partial<Record<CardId, (s: GameState) => boolean>> = {
   cred: (s) => anyEmp(s, 'samepw'),
   tail: (s) => anyEmp(s, 'lazy', 'kind'),
   mfa: (s) => anyEmp(s, 'approver'),
-  brute: (s) => has(node(s, 'infra'), 'weakpw'),
+  brute: (s) => has(node(s, 'infra'), 'weakpw') || has(node(s, 'infra'), 'remote'),
   exploit: (s) => has(node(s, 'infra'), 'buggy') || has(node(s, 'infra'), 'legacy'),
   inject: (s) => has(node(s, 'ai'), 'obey') || has(node(s, 'ai'), 'nohuman'),
-  exfil: (s) => has(node(s, 'ai'), 'masterkey'),
+  exfil: (s) => has(node(s, 'ai'), 'masterkey') || has(node(s, 'ai'), 'nohuman'),
 }
 
 let bad = 0

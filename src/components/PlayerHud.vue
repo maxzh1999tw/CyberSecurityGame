@@ -105,7 +105,7 @@ watch(
   position: absolute;
   left: 22px;
   bottom: 22px;
-  width: 262px;
+  width: 320px;
   height: 150px;
   pointer-events: none;
 }
@@ -131,7 +131,7 @@ watch(
   position: absolute;
   left: 144px;
   bottom: 4px;
-  width: 118px;
+  width: 176px;
   display: flex;
   flex-direction: column;
   gap: 8px;

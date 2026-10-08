@@ -50,10 +50,13 @@ export function missionGoals(s: GameState): Goal[] {
       ]
     }
     case 'airebel': {
-      const mk = knownHas(ai, 'masterkey')
+      // 資料能不能送出去：萬能鑰匙，或 AI 全自動沒人把關，任何一個成立就行
+      const k1 = knownHas(ai, 'masterkey')
+      const k2 = knownHas(ai, 'nohuman')
+      const out = k1 === 'Y' || k2 === 'Y' ? 'Y' : k1 === 'N' && k2 === 'N' ? 'N' : 'M'
       return [
         { icon: 'bot', label: '控制 AI 助理', done: ai.controlled },
-        { icon: 'key-square', label: '萬能鑰匙', done: mk === 'Y', unknown: mk === 'M' },
+        { icon: 'key-square', label: '能外送資料', done: out === 'Y', unknown: out === 'M' },
         { icon: 'send', label: '資料外送', done: false },
       ]
     }

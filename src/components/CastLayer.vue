@@ -3,7 +3,7 @@
 //   成功：爆開、吸收；被防護擋下：撞碎成碎片；什麼也沒發生：從下往上燒成灰
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { sfx } from '../audio/sfx'
-import { castApi, ui, view } from '../game/store'
+import { boardCenter, castApi, ui, view } from '../game/store'
 import type { CastSpec } from '../game/store'
 import type { CardId } from '../game/types'
 import CardFace from './CardFace.vue'
@@ -326,7 +326,7 @@ async function run(spec: CastSpec) {
   el.style.opacity = '1'
 
   try {
-    const C = { x: view.w / 2, y: Math.round(view.h * 0.43) }
+    const C = { x: boardCenter(), y: Math.round(view.h * 0.43) }
     const p0 = spec.from
     place([el], { x: p0.x, y: p0.y, s: p0.scale, r: 0 })
 

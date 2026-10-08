@@ -12,6 +12,9 @@ export const BASE_H = 1080
 export const MAX_W = 2600
 /** 底部手牌區的高度 */
 export const HAND_ZONE = 300
+/** 左右兩欄的寬度（舞台座標）；中間的棋盤區在兩欄之間 */
+export const RAIL_LEFT = 350
+export const RAIL_RIGHT = 280
 
 export interface Rect {
   x: number
@@ -97,7 +100,9 @@ export const view = reactive({ left: 0, top: 0, scale: 1, w: BASE_W, h: BASE_H }
 /** 拖到這條線以上才算「打到場上」 */
 export const playLine = () => view.h - HAND_ZONE
 /** 手牌扇形的原點（舞台座標） */
-export const handOrigin = () => ({ x: view.w / 2, y: view.h })
+/** 棋盤區（兩欄之間）的水平中心：手牌、出牌演出都以它為中心 */
+export const boardCenter = () => (RAIL_LEFT + view.w - RAIL_RIGHT) / 2
+export const handOrigin = () => ({ x: boardCenter(), y: view.h })
 
 /** 依視窗大小決定舞台尺寸與縮放 */
 export function fitStage(vw: number, vh: number) {
@@ -484,7 +489,7 @@ function onUp(ev: PointerEvent) {
     }
     if (s.ap < E.cardCost(s, d.id, d.overNode)) return denyAp()
     // 需要選目標的牌：放開前停在場下方中央
-    void commitPlay(d.uid, d.overNode, { x: view.w / 2, y: view.h - 250, scale: 0.8 })
+    void commitPlay(d.uid, d.overNode, { x: boardCenter(), y: view.h - 250, scale: 0.8 })
   } else {
     if (!overBoard) {
       sfx.cancel()
@@ -607,7 +612,7 @@ async function commitPlayInner(uid: number, targetId?: string, from?: CastSpec['
   const ef = preview?.effect
   const aimId = targetId ?? ef?.captured[0] ?? ef?.paralyzed ?? ef?.revealed[0]?.node ?? E.hintNodes(s, id)[0] ?? null
   const aimRect = SUPPORT_AIM[id] ? anchorRect(SUPPORT_AIM[id]!) : aimId ? nodeRect(aimId) : null
-  const tx = aimRect ? aimRect.cx : view.w / 2
+  const tx = aimRect ? aimRect.cx : boardCenter()
   const ty = aimRect ? aimRect.cy : 420
 
   let outcome: CastSpec['outcome'] = 'ok'
@@ -621,7 +626,7 @@ async function commitPlayInner(uid: number, targetId?: string, from?: CastSpec['
   sfx.drop()
   const spec: CastSpec = {
     card: id,
-    from: from ?? { x: view.w / 2, y: view.h - 190, scale: 0.8 },
+    from: from ?? { x: boardCenter(), y: view.h - 190, scale: 0.8 },
     to: { x: tx, y: ty },
     theme: themeOf(id),
     outcome,
@@ -731,11 +736,24 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
 
   for (const rv of ef.revealed) flashSlot(rv.node, rv.idx, 'reveal')
 
+  // 完全沒有弱點的節點：蓋著的牌其中一張翻成「無懈可擊」
+  for (const id of ef.dry) {
+    const n = E.node(s, id)
+    if (!E.isImpregnable(n)) continue
+    const at = n.slots.findIndex((sl) => sl.vis === 0)
+    if (at >= 0) flashSlot(id, at, 'reveal', 1400)
+  }
   if (ef.dry.length > 2) {
-    plaque(view.w / 2, 400, { title: '掃描完畢', sub: '整間公司沒有更多弱點了', tone: 'info', icon: 'scan-eye' })
+    plaque(boardCenter(), 400, { title: '掃描完畢', sub: '整間公司沒有更多弱點了', tone: 'info', icon: 'scan-eye' })
   } else {
     for (const id of ef.dry) {
-      if (!notes.has(id)) notes.set(id, { title: '查無更多', sub: '沒有更多可用的弱點', tone: 'info', icon: 'scan-eye', style: 'tag' })
+      if (notes.has(id)) continue
+      notes.set(
+        id,
+        E.isImpregnable(E.node(s, id))
+          ? { title: '無懈可擊', sub: '這裡沒有任何可利用的弱點', tone: 'ice', icon: 'shield-check', style: 'stamp' }
+          : { title: '查無更多', sub: '沒有更多可用的弱點', tone: 'info', icon: 'scan-eye', style: 'tag' },
+      )
     }
   }
 
@@ -747,7 +765,7 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
   if (r.refund) {
     ui.apShake++
     const rr = aimId ? nodeRect(aimId) : null
-    float(rr?.cx ?? view.w / 2, (rr?.cy ?? 420) + 70, '省下 1 點', 'gold', 'zap')
+    float(rr?.cx ?? boardCenter(), (rr?.cy ?? 420) + 70, '省下 1 點', 'gold', 'zap')
   }
   if (r.noise > 0) {
     const ar = anchorRect('alert')
@@ -765,7 +783,7 @@ async function presentSupport(r: E.PlayResult) {
   const ef = r.effect
   const where = SUPPORT_AIM[r.card]
   const ar = where ? anchorRect(where) : null
-  const x = Math.max(340, Math.min(view.w - 340, ar?.cx ?? view.w / 2))
+  const x = Math.max(340, Math.min(view.w - 340, ar?.cx ?? boardCenter()))
   const y = ar?.cy ?? 420
   switch (r.card) {
     case 'wipelog':

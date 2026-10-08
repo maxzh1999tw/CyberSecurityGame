@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 第一次遊玩時的 4 步導覽：直接指著畫面上的東西
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { anchorRect, nodeRect, ui, view } from '../game/store'
+import { anchorRect, boardCenter, nodeRect, ui, view } from '../game/store'
 import type { Rect } from '../game/store'
 import Icon from './Icon.vue'
 
@@ -19,7 +19,7 @@ const STEPS: Step[] = [
     side: 'above',
   },
   {
-    target: () => ({ x: view.w / 2 - 400, y: view.h - 250, w: 800, h: 250, cx: view.w / 2, cy: view.h - 125 }),
+    target: () => ({ x: boardCenter() - 400, y: view.h - 250, w: 800, h: 250, cx: boardCenter(), cy: view.h - 125 }),
     text: '把手牌拖到目標身上就能出牌。實線綠框一定成功，虛線黃框要賭一把。',
     side: 'above',
   },

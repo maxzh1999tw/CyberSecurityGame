@@ -83,6 +83,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 }
 .rail.left {
   left: 0;
+  width: 350px;
   border-right: 2px solid #283246;
   display: flex;
   flex-direction: column;
@@ -102,7 +103,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 }
 .playzone {
   position: absolute;
-  left: 290px;
+  left: 360px;
   right: 290px;
   top: 88px;
   bottom: 250px;
@@ -121,7 +122,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 }
 .top {
   position: absolute;
-  left: 280px;
+  left: 350px;
   right: 280px;
   top: 12px;
   display: flex;

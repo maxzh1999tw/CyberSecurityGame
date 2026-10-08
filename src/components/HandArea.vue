@@ -5,7 +5,7 @@ import { sfx } from '../audio/sfx'
 import { CARDS } from '../game/data'
 import { knownHas, node, playability } from '../game/engine'
 import type { Playability } from '../game/engine'
-import { anchorRect, game, handOrigin, playLine, pointerDownCard, ui, view } from '../game/store'
+import { anchorRect, boardCenter, game, handOrigin, playLine, pointerDownCard, ui, view } from '../game/store'
 import type { CardInst } from '../game/types'
 import CardFace from './CardFace.vue'
 import CardTip from './CardTip.vue'
@@ -137,7 +137,7 @@ const nolog = computed(() => {
 </script>
 
 <template>
-  <div class="hand" :style="{ left: view.w / 2 + 'px', top: view.h + 'px' }">
+  <div class="hand" :style="{ left: boardCenter() + 'px', top: view.h + 'px' }">
     <div
       v-for="sl in slots"
       :key="sl.c.uid"

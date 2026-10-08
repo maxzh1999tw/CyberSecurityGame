@@ -146,6 +146,15 @@ export function hiddenIdx(n: GameNode): number[] {
   return out
 }
 
+/**
+ * 這個節點完全沒有弱點（每一格都是「已防護」）。
+ * 它看起來和別的節點一樣蓋著牌；硬用偵查牌去翻，只會翻到「無懈可擊」。
+ * 病毒等連鎖反應只會翻真正的弱點，不會浪費在這種節點上。
+ */
+export function isImpregnable(n: GameNode): boolean {
+  return n.slots.every((sl) => sl.shield)
+}
+
 /** 還蓋著、而且真的能利用的弱點（搜尋類的牌只會翻到這些，不會翻到防護） */
 function hiddenVulnIdx(n: GameNode): number[] {
   const out: number[] = []
@@ -308,7 +317,7 @@ export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null):
     case 'mfa':
       return t ? and(reach(s, H, t), H(t, 'approver')) : 'N'
     case 'brute':
-      return and(reach(s, H, infra), H(infra, 'weakpw'))
+      return and(reach(s, H, infra), or(H(infra, 'weakpw'), H(infra, 'remote')))
     case 'exploit':
       return and(reach(s, H, infra), or(H(infra, 'buggy'), H(infra, 'legacy')))
     case 'inject':
@@ -327,7 +336,7 @@ export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null):
     case 'bec':
       return t ? and(yn(node(s, 'boss').controlled), H(t, 'gullible')) : 'N'
     case 'exfil':
-      return and(yn(ai.controlled), H(ai, 'masterkey'))
+      return and(yn(ai.controlled), or(H(ai, 'masterkey'), H(ai, 'nohuman')))
     case 'wreck': {
       const it = node(s, 'it')
       return and(yn(infra.controlled), yn(it.controlled || it.paralyzed > 0))
@@ -369,7 +378,10 @@ function tested(s: GameState, id: CardId, t: GameNode | null): Array<[GameNode, 
     case 'mfa':
       return t ? [[t, 'approver']] : []
     case 'brute':
-      return [[infra, 'weakpw']]
+      return [
+        [infra, 'weakpw'],
+        [infra, 'remote'],
+      ]
     case 'exploit':
       return [
         [infra, 'buggy'],
@@ -396,7 +408,10 @@ function tested(s: GameState, id: CardId, t: GameNode | null): Array<[GameNode, 
     case 'ransom':
       return [[backup, 'nobackup']]
     case 'exfil':
-      return [[ai, 'masterkey']]
+      return [
+        [ai, 'masterkey'],
+        [ai, 'nohuman'],
+      ]
     default:
       return []
   }
@@ -594,7 +609,7 @@ function entryFor(s: GameState, id: CardId, t: GameNode | null): Entry | null {
     case 'tail':
       return t ? { node: t.id, vuln: effective(t, 'lazy') ? 'lazy' : 'kind' } : null
     case 'brute':
-      return { node: infra.id, vuln: 'weakpw' }
+      return { node: infra.id, vuln: effective(infra, 'weakpw') ? 'weakpw' : 'remote' }
     case 'exploit':
       return { node: infra.id, vuln: effective(infra, 'buggy') ? 'buggy' : 'legacy' }
     case 'inject':
@@ -1311,7 +1326,7 @@ export function routeExists(s: GameState): boolean {
     case 'bossfraud':
       return boss.controlled && c.nodes.some((e) => isEmployee(e) && e.id !== 'boss' && effective(e, 'gullible'))
     case 'airebel':
-      return ai.controlled && effective(ai, 'masterkey')
+      return ai.controlled && (effective(ai, 'masterkey') || effective(ai, 'nohuman'))
     case 'sabotage': {
       const infra = node(c, 'infra')
       const it = node(c, 'it')

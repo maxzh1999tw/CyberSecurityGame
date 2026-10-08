@@ -51,7 +51,7 @@ const openAbove = computed(() => {
 <style scoped>
 .board {
   position: absolute;
-  left: 290px;
+  left: 360px;
   right: 290px;
   top: 92px;
   bottom: 262px;

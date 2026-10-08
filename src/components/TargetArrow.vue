@@ -1,14 +1,14 @@
 <script setup lang="ts">
 // 需要選目標的牌：從牌拉出一條箭頭指向目標
 import { computed } from 'vue'
-import { nodeRect, ui, view } from '../game/store'
+import { boardCenter, nodeRect, ui, view } from '../game/store'
 
 const d = computed(() => (ui.drag && ui.drag.moved && ui.drag.mode === 'node' ? ui.drag : null))
 
 const geom = computed(() => {
   const dr = d.value
   if (!dr) return null
-  const sx = view.w / 2
+  const sx = boardCenter()
   const sy = view.h - 250 - 136
   let ex = dr.x
   let ey = dr.y

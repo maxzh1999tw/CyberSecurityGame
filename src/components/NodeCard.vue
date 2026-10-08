@@ -2,7 +2,7 @@
 // 公司裡的一個節點（員工、AI、設備、資料……）
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { VULNS } from '../game/data'
-import { etaOf, reachKnown, recaptureBlock, repairBlock, speedOf } from '../game/engine'
+import { etaOf, isImpregnable, reachKnown, recaptureBlock, repairBlock, speedOf } from '../game/engine'
 import { game, registerNode, ui } from '../game/store'
 import type { GameNode, VulnId } from '../game/types'
 import Icon from './Icon.vue'
@@ -50,7 +50,7 @@ const locked = computed(() => {
 
 interface SlotView {
   idx: number
-  state: 'hidden' | 'vuln' | 'struck' | 'shield' | 'fixed'
+  state: 'hidden' | 'vuln' | 'struck' | 'shield' | 'fixed' | 'wall'
   name: string
   icon: string
   vis: 0 | 1 | 2
@@ -60,10 +60,14 @@ interface SlotView {
   eta: number
 }
 
+// 完全沒有弱點的節點：被偵查牌翻過之後，其中一張蓋著的牌會翻成「無懈可擊」
+const wallIdx = computed(() => (n.value.sealed && isImpregnable(n.value) ? n.value.slots.findIndex((sl) => sl.vis === 0) : -1))
+
 const slots = computed<SlotView[]>(() =>
   n.value.slots.map((sl, idx) => {
     const d = VULNS[sl.vuln]
     const fx = ui.slotFx[n.value.id + ':' + idx] ?? ''
+    if (idx === wallIdx.value) return { idx, state: 'wall', name: '無懈可擊', icon: 'shield-check', vis: 1, kind: d.kind, fx, eta: 0 }
     if (sl.vis === 0) return { idx, state: 'hidden', name: '', icon: '', vis: 0, kind: d.kind, fx, eta: 0 }
     if (sl.shield)
       return { idx, state: 'shield', name: d.shield, icon: 'shield-check', vis: sl.vis, kind: d.kind, fx, eta: 0 }
@@ -478,6 +482,7 @@ function leave() {
   text-decoration-thickness: 2.5px;
 }
 .st-shield,
+.st-wall,
 .st-fixed {
   font-size: 16.5px;
   color: #0d4a3a;
@@ -485,6 +490,7 @@ function leave() {
   box-shadow: inset 6px 0 0 #2b9c78;
 }
 .st-shield .sic,
+.st-wall .sic,
 .st-fixed .sic {
   color: #1f7f62;
 }
