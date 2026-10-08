@@ -1,0 +1,170 @@
+/* ───────── 全域樣式：深灰石板桌面 + 米白紙質卡 ───────── */
+:root {
+  /* 桌面與面板 */
+  --table0: #0c1017;
+  --table1: #141a25;
+  --table2: #1b2331;
+  --slate: #232c3e;
+  --slate2: #2c374c;
+  --edge: #36445c;
+  --edge2: #4b5d7e;
+
+  /* 紙卡 */
+  --paper: #f4ecd8;
+  --paper2: #e7dbbd;
+  --paper3: #cdbd96;
+  --ink: #1c2332;
+  --ink2: #4a5570;
+
+  /* 金屬邊 */
+  --gold: #d8b05a;
+  --gold2: #f2d994;
+  --gold3: #8f6a26;
+
+  /* 文字 */
+  --text: #f2f5fa;
+  --text2: #b5c1d6;
+  --text3: #7f8da6;
+
+  /* 狀態色（都刻意壓低飽和度） */
+  --good: #3fae7c;
+  --good2: #86e2b6;
+  --bad: #d4503f;
+  --bad2: #ff9a8c;
+  --warn: #e0a02c;
+  --blue: #4f86c6;
+  --blue2: #9cc4f2;
+
+  /* 牌的種類色 */
+  --c-recon: #2b7ea6;
+  --c-action: #b8432f;
+  --c-paralyze: #6b4c9a;
+  --c-finish: #b98a2a;
+
+  /* 節點種類色 */
+  --k-employee: #bf7a2a;
+  --k-infra: #3d6fa8;
+  --k-ai: #8b4fa3;
+  --k-data: #2e8b7b;
+
+  /* 舊名稱（相容） */
+  --hacker: var(--good);
+  --danger: var(--bad);
+  --cyan: var(--blue2);
+  --line: var(--edge);
+  --line-strong: var(--edge2);
+  --text-dim: var(--text2);
+  --text-faint: var(--text3);
+
+  --font-ui: 'Noto Sans TC', 'Microsoft JhengHei', 'PingFang TC', system-ui, sans-serif;
+  --font-num: 'Rajdhani', 'Noto Sans TC', sans-serif;
+  --font-logo: 'Orbitron', 'Noto Sans TC', sans-serif;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--table0);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  padding: 0;
+}
+
+svg {
+  display: block;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 175, 215, 0.3);
+  border-radius: 4px;
+}
+
+/* 共用動畫（刻意保持克制） */
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes float-up {
+  0% {
+    transform: translate(-50%, 0) scale(0.7);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(-50%, -12px) scale(1.08);
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -64px) scale(1);
+    opacity: 0;
+  }
+}
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-8px);
+  }
+  40% {
+    transform: translateX(7px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+/* 桌面材質：細緻的雜訊，讓大面積深色不死板 */
+.felt {
+  background-color: var(--table1);
+  background-image:
+    radial-gradient(ellipse 85% 75% at 50% 42%, rgba(60, 78, 110, 0.35), rgba(10, 14, 20, 0) 70%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .05 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
+}
+
+/* 出牌演出：牌燒毀的進度 */
+@property --burn {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
