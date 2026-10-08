@@ -22,6 +22,7 @@ const THEME: Record<CastSpec['theme'], { c: string; c2: string }> = {
   alarm: { c: '#ff5a4a', c2: '#ffd2cc' },
   virus: { c: '#7ee06a', c2: '#dcffd2' },
   finish: { c: '#f2c040', c2: '#fff1c4' },
+  support: { c: '#3fc7a0', c2: '#d6fff1' },
 }
 
 // ───────────── 小工具 ─────────────
@@ -270,6 +271,11 @@ function impactFx(theme: CastSpec['theme'], x: number, y: number) {
     case 'virus':
       ring(x, y, T.c, { r: 150, dur: 620 })
       burst(x, y, { n: 30, color: [T.c, T.c2, '#3fae4a'], spread: [40, 170], life: [700, 1200], size: [8, 20], shape: 'dot', gravity: 70, glow: true })
+      break
+    case 'support':
+      ring(x, y, T.c, { r: 150, dur: 560 })
+      ring(x, y, T.c2, { r: 95, dur: 460, delay: 100, width: 4 })
+      burst(x, y, { n: 20, color: [T.c, T.c2, '#ffffff'], spread: [50, 150], life: [600, 1000], size: [9, 18], shape: 'diamond', rise: 50, glow: true })
       break
     case 'finish':
       flashScreen('#ffe9a8', 620, 0.5)

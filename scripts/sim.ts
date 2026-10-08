@@ -1,8 +1,10 @@
 // 平衡測試：用簡單的電腦玩家跑很多局，看勝率
 //   node scripts/sim.ts 100            → 每種組合跑 100 局
 //   node scripts/sim.ts 1 show ransom  → 印出幾局「路線被封死」的過程
-import { CARDS } from '../src/game/data.ts'
+//   NO_SUPPORT=1 node scripts/sim.ts 100 → 牌堆不放資源管理牌（看它們對勝率的影響）
+import { CARDS, CARD_IDS } from '../src/game/data.ts'
 import {
+  CARD_COPIES,
   cardCost,
   endOfTurn,
   newGame,
@@ -14,6 +16,10 @@ import {
   startHackerTurn,
 } from '../src/game/engine.ts'
 import type { CardId, GameState, MissionId, ScenarioId } from '../src/game/types.ts'
+
+if (process.env.NO_SUPPORT) for (const id of CARD_IDS) if (CARDS[id].cat === 'support') CARD_COPIES[id] = 0
+// OFF=energy,proxy → 只拿掉指定的牌
+for (const id of (process.env.OFF ?? '').split(',').filter(Boolean)) CARD_COPIES[id as CardId] = 0
 
 interface Choice {
   uid: number
@@ -51,6 +57,16 @@ function bestChoice(s: GameState): Choice | null {
         const needWipe = s.mission === 'ransom' && c.id === 'wipe'
         const needAlarm = s.mission === 'sabotage' && c.id === 'alarm'
         sc = needWipe || needAlarm ? (o.tri === 'Y' ? 70 : 0) : c.id === 'alarm' ? (s.alert >= 4 ? 40 : 0) : 0
+      } else if (def.cat === 'support') {
+        // 資源管理牌：警戒高才降警戒；手牌少才抽牌；熬夜趕工是免費的行動點
+        const a = s.alert
+        sc =
+          c.id === 'wipelog' ? (a >= 5 ? 55 : a >= 3 ? 20 : 0)
+          : c.id === 'proxy' ? (a >= 6 ? 60 : a >= 4 ? 25 : 0)
+          : c.id === 'darkweb' ? (s.hand.length <= 6 ? 22 : 0)
+          : c.id === 'energy' ? 60
+          : c.id === 'stash' ? (s.ap >= 3 ? 12 : 0)
+          : 0
       } else {
         sc = ({ osint: 45, smooth: 28, ally: 26, scan: s.alert <= 2 ? 24 : 0, virus: 30 } as Record<string, number>)[c.id] ?? 20
         if (c.id === 'osint' && o.target) {

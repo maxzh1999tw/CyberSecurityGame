@@ -423,6 +423,9 @@ section {
 .pl.cat-finish {
   --cc: var(--c-finish);
 }
+.pl.cat-support {
+  --cc: var(--c-support);
+}
 .pl.no {
   opacity: 0.6;
 }

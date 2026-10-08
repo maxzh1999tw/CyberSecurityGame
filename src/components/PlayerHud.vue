@@ -6,7 +6,8 @@ import { endTurn, game, playerHasMoves, registerAnchor, ui } from '../game/store
 import Icon from './Icon.vue'
 
 const s = computed(() => game.s!)
-const total = computed(() => Math.max(s.value.apBase + s.value.apBonus, s.value.ap))
+// 行動點總數：基本 + 員工加成 + 上回合保留的，或是這回合臨時多拿的
+const total = computed(() => Math.max(s.value.apBase + s.value.apBonus + s.value.apCarry, s.value.ap))
 const canEnd = computed(() => !ui.busy && s.value.phase === 'hacker')
 // 手牌全部打不出去：有行動點就提示「換牌」，沒有才提示「結束回合」
 const noMoves = computed(() => canEnd.value && !playerHasMoves(s.value))
@@ -44,10 +45,15 @@ watch(
           <path d="M50 71 Q60 76 70 71" fill="none" stroke="#86e2b6" stroke-width="2.4" stroke-linecap="round" opacity="0.8" />
         </svg>
       </div>
-      <div class="ap" :class="{ shaking }">
+      <div :ref="(el) => registerAnchor('ap', el as HTMLElement | null)" class="ap" :class="{ shaking }">
         <div class="count"><Icon name="zap" :size="26" :stroke="2.6" /><b>{{ s.ap }}</b><small>/{{ total }}</small></div>
         <div class="gems">
-          <i v-for="i in total" :key="i" class="gem" :class="{ full: i <= s.ap, bonus: i > s.apBase }"></i>
+          <i
+            v-for="i in total"
+            :key="i"
+            class="gem"
+            :class="{ full: i <= s.ap, bonus: i > s.apBase && i <= s.apBase + s.apBonus }"
+          ></i>
         </div>
       </div>
       <div v-if="s.freePlayReady" class="free"><Icon name="sparkles" :size="17" :stroke="2.4" />本回合 1 張免費</div>

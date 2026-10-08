@@ -85,6 +85,9 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
 .cat-finish {
   --cc: var(--c-finish);
 }
+.cat-support {
+  --cc: var(--c-support);
+}
 
 .art {
   position: absolute;

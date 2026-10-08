@@ -30,7 +30,14 @@ import type {
 } from './types.ts'
 
 export const BASE_AP = 3
-export const HAND_SIZE = 5
+/** 開局發幾張牌 */
+export const OPENING_HAND = 5
+/** 之後每回合抽幾張 */
+export const DRAW_PER_TURN = 2
+/** 手牌上限：滿了就不再抽 */
+export const HAND_MAX = 8
+/** 上回合沒用完的行動點，最多保留幾點到下一回合 */
+export const AP_CARRY_MAX = 2
 export const MAX_ALERT = 10
 
 /** 每種牌在牌堆裡的張數（沒寫就是 1） */
@@ -325,6 +332,13 @@ export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null):
       const it = node(s, 'it')
       return and(yn(infra.controlled), yn(it.controlled || it.paralyzed > 0))
     }
+    // 資源管理牌：沒有「需要哪個弱點」的條件，能不能打看 legal
+    case 'wipelog':
+    case 'proxy':
+    case 'darkweb':
+    case 'energy':
+    case 'stash':
+      return 'Y'
   }
 }
 
@@ -431,6 +445,16 @@ function legal(s: GameState, id: CardId, t: GameNode | null): boolean {
       return ai.controlled
     case 'wreck':
       return infra.controlled
+    case 'wipelog':
+    case 'proxy':
+      return s.alert >= 1
+    case 'darkweb':
+      // 這張牌打出去之後，手牌一定有空位；只要牌堆或棄牌堆還有牌可抽
+      return s.deck.length + s.discard.length > 0
+    case 'energy':
+      return true
+    case 'stash':
+      return s.carryBoost === 0
   }
 }
 
@@ -603,6 +627,14 @@ export interface Effect {
   virus: boolean
   finish: boolean
   entry: Entry | null
+  /** 資源管理牌：警戒值實際降了多少（負數） */
+  alertDelta: number
+  /** 資源管理牌：這次抽到的牌 */
+  drawn: CardInst[]
+  /** 資源管理牌：本回合多拿到的行動點 */
+  apGain: number
+  /** 囤積補給：本回合保留上限提高了 */
+  stash: boolean
 }
 
 /** 只處理「牌的效果」，不含費用與噪音 */
@@ -618,6 +650,10 @@ export function resolve(s: GameState, id: CardId, t: GameNode | null): Effect {
     virus: false,
     finish: false,
     entry: null,
+    alertDelta: 0,
+    drawn: [],
+    apGain: 0,
+    stash: false,
   }
   const infra = node(s, 'infra')
   const ai = node(s, 'ai')
@@ -720,6 +756,24 @@ export function resolve(s: GameState, id: CardId, t: GameNode | null): Effect {
       case 'wreck':
         eff.finish = true
         break
+      case 'wipelog':
+      case 'proxy': {
+        const before = s.alert
+        s.alert = Math.max(0, s.alert - (id === 'proxy' ? 3 : 2))
+        eff.alertDelta = s.alert - before
+        break
+      }
+      case 'darkweb':
+        eff.drawn = drawCards(s, 2)
+        break
+      case 'energy':
+        s.ap += 2
+        eff.apGain = 2
+        break
+      case 'stash':
+        s.carryBoost = 2
+        eff.stash = true
+        break
     }
   } else {
     // 勒索軟體：資料庫已被控制，但備份完好 → 公司還原（順便看到備份為什麼救得回來）
@@ -779,9 +833,12 @@ export function playCard(s: GameState, uid: number, targetId?: string): PlayResu
   s.ap -= cost
   if (free) s.freePlayReady = false
   s.hand.splice(idx, 1)
-  s.discard.push(inst)
+  // 暗網情報要抽牌：先抽完再把自己放進棄牌堆，免得牌堆見底時又抽回自己
+  const holdDiscard = id === 'darkweb'
+  if (!holdDiscard) s.discard.push(inst)
 
   const effect = resolve(s, id, t)
+  if (holdDiscard) s.discard.push(inst)
 
   let refund = 0
   if (id === 'osint' && t && !knownDiscount && effective(t, 'oversharer')) {
@@ -894,9 +951,10 @@ export function drawCard(s: GameState): CardInst | null {
   return s.deck.pop() ?? null
 }
 
-export function drawUp(s: GameState): CardInst[] {
+/** 抽最多 n 張牌；手牌滿 8 張就不再抽 */
+export function drawCards(s: GameState, n: number): CardInst[] {
   const out: CardInst[] = []
-  while (s.hand.length < HAND_SIZE) {
+  while (out.length < n && s.hand.length < HAND_MAX) {
     const c = drawCard(s)
     if (!c) break
     s.hand.push(c)
@@ -910,14 +968,19 @@ export function apBonusOf(s: GameState): number {
 }
 
 export function startHackerTurn(s: GameState): CardInst[] {
+  // 上回合沒用完的行動點，最多保留 2 點（囤積補給可以再多留 2 點）
+  const carry = s.turn > 0 ? Math.min(AP_CARRY_MAX + s.carryBoost, Math.max(0, s.ap)) : 0
   s.turn += 1
   s.apBase = BASE_AP
   s.apBonus = apBonusOf(s)
-  s.ap = s.apBase + s.apBonus
+  s.apCarry = carry
+  s.carryBoost = 0
+  s.ap = s.apBase + s.apBonus + s.apCarry
   s.noiseThisTurn = 0
   s.freePlayReady = node(s, 'ai').controlled
   s.phase = 'hacker'
-  return drawUp(s)
+  // 第一回合發開局手牌；之後每回合抽 2 張
+  return drawCards(s, s.turn === 1 ? OPENING_HAND : DRAW_PER_TURN)
 }
 
 // ───────────────────────── 回合結束：公司的反應倒數 ─────────────────────────
@@ -1219,7 +1282,7 @@ export function uselessCards(s0: GameState): CardId[] {
   const c = idealClosure(initialWorld(s0))
   const usable = (id: CardId): boolean => {
     // 偵查牌（掃描、肉搜、盟友）與這局的得手牌，沒有「缺哪個弱點」的問題
-    if (id === 'scan' || id === 'osint' || id === 'ally' || CARDS[id].cat === 'finish') return true
+    if (id === 'scan' || id === 'osint' || id === 'ally' || CARDS[id].cat === 'finish' || CARDS[id].cat === 'support') return true
     if (id === 'virus') return node(c, 'infra').controlled
     if (id === 'smooth') return condition(c, trueHas, id, null) === 'Y'
     const targets = CARDS[id].targeting === 'node' ? c.nodes.filter(isEmployee) : [implicitTarget(c, id)]
@@ -1335,6 +1398,8 @@ export function newGame(opts: NewGameOptions = {}): GameState {
     ap: 0,
     apBase: BASE_AP,
     apBonus: 0,
+    apCarry: 0,
+    carryBoost: 0,
     alert: 0,
     noiseThisTurn: 0,
     freePlayReady: false,

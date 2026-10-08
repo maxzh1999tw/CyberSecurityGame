@@ -113,6 +113,11 @@ import {
   Download as I_Download,
   ServerCrash as I_ServerCrash,
   ScrollText as I_ScrollText,
+  Eraser as I_Eraser,
+  Waypoints as I_Waypoints,
+  PackageSearch as I_PackageSearch,
+  Coffee as I_Coffee,
+  PiggyBank as I_PiggyBank,
 } from 'lucide-vue-next'
 
 export const ICONS: Record<string, Component> = {
@@ -228,4 +233,9 @@ export const ICONS: Record<string, Component> = {
   'download': I_Download,
   'server-crash': I_ServerCrash,
   'scroll-text': I_ScrollText,
+  'eraser': I_Eraser,
+  'waypoints': I_Waypoints,
+  'package-search': I_PackageSearch,
+  'coffee': I_Coffee,
+  'piggy-bank': I_PiggyBank,
 }

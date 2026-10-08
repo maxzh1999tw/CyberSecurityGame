@@ -76,7 +76,7 @@ export interface CastSpec {
   card: CardId
   from: { x: number; y: number; scale: number }
   to: { x: number; y: number }
-  theme: 'scan' | 'hack' | 'frost' | 'alarm' | 'virus' | 'finish'
+  theme: 'scan' | 'hack' | 'frost' | 'alarm' | 'virus' | 'finish' | 'support'
   /** ok：成功；blocked：被防護擋下（撞碎）；fizzle：什麼也沒發生（燒掉） */
   outcome: 'ok' | 'blocked' | 'fizzle'
   /** 命中的瞬間呼叫：真正套用牌的效果並播放畫面上的結果 */
@@ -378,6 +378,13 @@ export function deadReason(s: GameState, id: CardId): string {
     case 'osint':
     case 'smooth':
       return '已經沒有蓋著的牌可以揭露'
+    case 'wipelog':
+    case 'proxy':
+      return '警戒值已經是 0'
+    case 'darkweb':
+      return '牌堆已經沒有牌可以抽'
+    case 'stash':
+      return '這回合已經囤積過了'
     default:
       return '已確認沒有可利用的弱點'
   }
@@ -564,9 +571,20 @@ function themeOf(id: CardId): CastSpec['theme'] {
       return 'finish'
     case 'paralyze':
       return 'frost'
+    case 'support':
+      return 'support'
     default:
       return 'hack'
   }
+}
+
+/** 資源管理牌飛向畫面上的哪個位置 */
+const SUPPORT_AIM: Partial<Record<CardId, string>> = {
+  wipelog: 'alert',
+  proxy: 'alert',
+  darkweb: 'deck',
+  energy: 'ap',
+  stash: 'ap',
 }
 
 async function commitPlayInner(uid: number, targetId?: string, from?: CastSpec['from']) {
@@ -588,7 +606,7 @@ async function commitPlayInner(uid: number, targetId?: string, from?: CastSpec['
   // 飛行的終點：目標節點；不用選目標的牌，飛向它實際影響的節點
   const ef = preview?.effect
   const aimId = targetId ?? ef?.captured[0] ?? ef?.paralyzed ?? ef?.revealed[0]?.node ?? E.hintNodes(s, id)[0] ?? null
-  const aimRect = aimId ? nodeRect(aimId) : null
+  const aimRect = SUPPORT_AIM[id] ? anchorRect(SUPPORT_AIM[id]!) : aimId ? nodeRect(aimId) : null
   const tx = aimRect ? aimRect.cx : view.w / 2
   const ty = aimRect ? aimRect.cy : 420
 
@@ -677,6 +695,8 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
       sfx.success()
       const id = aimId ?? 'db'
       notes.set(id, { title: '得手!', tone: 'gold', icon: 'flag', style: 'stamp' })
+    } else if (def.cat === 'support') {
+      await presentSupport(r)
     } else if (ef.revealed.length) {
       sfx.reveal()
       for (const [id, list] of found) notes.set(id, { title: '發現弱點', sub: quote(list), tone: 'gold', icon: 'scan-eye', style: 'tag' })
@@ -740,6 +760,63 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
   await wait(750)
 }
 
+/** 資源管理牌的結果：在對應的位置（警戒條、行動點、牌堆）旁放銘牌 */
+async function presentSupport(r: E.PlayResult) {
+  const ef = r.effect
+  const where = SUPPORT_AIM[r.card]
+  const ar = where ? anchorRect(where) : null
+  const x = Math.max(340, Math.min(view.w - 340, ar?.cx ?? view.w / 2))
+  const y = ar?.cy ?? 420
+  switch (r.card) {
+    case 'wipelog':
+    case 'proxy':
+      sfx.coolDown()
+      ui.alertShake++
+      plaque(x, y + 92, {
+        title: `警戒 ${ef.alertDelta}`,
+        sub: r.card === 'wipelog' ? '日誌被清掉了' : '追查的人迷路了',
+        tone: 'ice',
+        icon: CARDS[r.card].icon,
+        style: 'stamp',
+      })
+      break
+    case 'darkweb': {
+      const n = ef.drawn.length
+      plaque(x, y - 96, {
+        title: n ? `抽 ${n} 張` : '沒有抽到牌',
+        sub: n < 2 ? `手牌最多 ${E.HAND_MAX} 張` : undefined,
+        tone: 'gold',
+        icon: 'package-search',
+        style: 'tag',
+      })
+      if (n) {
+        // 新抽到的牌從牌堆飛進手牌
+        ui.freshCards = ef.drawn.map((c) => c.uid)
+        ef.drawn.forEach((_, i) => setTimeout(() => sfx.draw(), i * 110))
+        await wait(650)
+        ui.freshCards = []
+      }
+      break
+    }
+    case 'energy':
+      sfx.success()
+      ui.apShake++
+      plaque(x, y - 96, { title: '行動點 +2', sub: '本回合', tone: 'good', icon: 'coffee', style: 'stamp' })
+      break
+    case 'stash':
+      sfx.reveal()
+      ui.apShake++
+      plaque(x, y - 96, {
+        title: '保留上限 4',
+        sub: '回合結束最多保留 4 點行動點',
+        tone: 'gold',
+        icon: 'piggy-bank',
+        style: 'tag',
+      })
+      break
+  }
+}
+
 function E_vulnName(v: string) {
   return VULNS[v as keyof typeof VULNS]?.name ?? v
 }
@@ -798,8 +875,9 @@ async function endTurnInner() {
     return
   }
   const before = new Set(s.hand.map((c) => c.uid))
-  E.startHackerTurn(s)
+  const drew = E.startHackerTurn(s)
   ui.freshCards = s.hand.filter((c) => !before.has(c.uid)).map((c) => c.uid)
+  if (drew.length < E.DRAW_PER_TURN && s.hand.length >= E.HAND_MAX) toast(`手牌已滿 ${E.HAND_MAX} 張，這回合少抽了`)
   await showBanner('你的回合', 'hacker', undefined, 700)
   ui.freshCards.forEach((_, i) => setTimeout(() => sfx.draw(), i * 110))
   await wait(700)

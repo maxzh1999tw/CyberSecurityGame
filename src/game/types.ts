@@ -91,9 +91,16 @@ export type CardId =
   | 'bec'
   | 'exfil'
   | 'wreck'
+  // 資源管理
+  | 'wipelog'
+  | 'proxy'
+  | 'darkweb'
+  | 'energy'
+  | 'stash'
 
-export type Stage = '偵查' | '入侵' | '擴散' | '潛伏' | '得手'
-export type CardCat = 'recon' | 'action' | 'paralyze' | 'finish'
+/** 支援：資源管理牌，不算在攻擊流程裡 */
+export type Stage = '偵查' | '入侵' | '擴散' | '潛伏' | '得手' | '支援'
+export type CardCat = 'recon' | 'action' | 'paralyze' | 'finish' | 'support'
 
 export interface CardDef {
   id: CardId
@@ -215,6 +222,10 @@ export interface GameState {
   ap: number
   apBase: number
   apBonus: number
+  /** 上回合沒用完、保留到這回合的行動點 */
+  apCarry: number
+  /** 這回合結束時，可保留行動點的上限加成（囤積補給） */
+  carryBoost: number
   alert: number
   noiseThisTurn: number
   freePlayReady: boolean
