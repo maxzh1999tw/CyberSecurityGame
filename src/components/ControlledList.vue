@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 左欄：我控制了哪些節點（以及公司還要幾回合奪回）
 import { computed } from 'vue'
-import { etaOf, recaptureBlock, speedOf } from '../game/engine'
+import { etaOf, recaptureBlock, recaptureSpeedOf } from '../game/engine'
 import { game, ui } from '../game/store'
 import Icon from './Icon.vue'
 import NodeArt from './NodeArt.vue'
@@ -13,7 +13,7 @@ const mine = computed(() =>
     .sort((a, b) => a.controlSeq - b.controlSeq)
     .map((n) => ({
       n,
-      eta: etaOf(n.timer, speedOf(s.value)),
+      eta: etaOf(n.timer, recaptureSpeedOf(s.value, n)),
     })),
 )
 const frozen = computed(() => recaptureBlock(s.value) !== null)
@@ -21,15 +21,17 @@ const frozen = computed(() => recaptureBlock(s.value) !== null)
 const ABILITY: Record<string, { icon: string; text: string }> = {
   sales: { icon: 'zap', text: '+1 行動點' },
   engineer: { icon: 'zap', text: '+1 行動點' },
-  boss: { icon: 'zap', text: '+1 行動點' },
+  boss: { icon: 'crown', text: '擴散 −1 行動點' },
   it: { icon: 'wrench', text: '修復暫停' },
   infra: { icon: 'bug', text: '病毒' },
   ai: { icon: 'sparkles', text: '每回合免費 1 張' },
   db: { icon: 'crown', text: '' },
-  backup: { icon: 'crown', text: '' },
+  backup: { icon: 'database-backup', text: '+1 抽牌' },
 }
 
 function look(id: string) {
+  if (ui.drag) return
+  ui.hoverSlot = null
   ui.hoverNode = id
 }
 </script>
@@ -38,11 +40,11 @@ function look(id: string) {
   <div class="mine">
     <div class="tag">我控制的節點<b>{{ mine.length }}</b></div>
     <div class="list">
-      <div v-for="m in mine" :key="m.n.id" class="row" @pointerenter="look(m.n.id)" @pointerleave="ui.hoverNode = null">
+      <div v-for="m in mine" :key="m.n.id" class="row" @pointerenter="look(m.n.id)" @pointerleave="ui.hoverNode === m.n.id && (ui.hoverNode = null)">
         <div class="av"><NodeArt :role="m.n.role" /></div>
         <div class="tx">
           <b>{{ m.n.name }}</b>
-          <span v-if="ABILITY[m.n.role].text"><Icon :name="ABILITY[m.n.role].icon" :size="14" :stroke="2.4" />{{ ABILITY[m.n.role].text }}</span>
+          <span v-if="ABILITY[m.n.role].text || m.n.role === 'backup'"><Icon :name="ABILITY[m.n.role].icon" :size="14" :stroke="2.4" /><template v-if="m.n.role !== 'backup' || m.n.paralyzed <= 0">{{ ABILITY[m.n.role].text }}</template></span>
         </div>
         <div class="eta" :class="{ frozen, soon: !frozen && m.eta <= 1 }" :key="m.eta">
           <Icon :name="frozen ? 'snowflake' : 'timer'" :size="16" :stroke="2.6" />{{ frozen ? '' : m.eta }}

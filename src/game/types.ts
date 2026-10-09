@@ -51,7 +51,9 @@ export interface VulnDef {
   id: VulnId
   name: string
   kind: NodeKind
-  /** 只會出現在這些角色的節點上（資料類才需要） */
+  /** 可跨多種節點出現；kind 保留作為主要分類與視覺樣式 */
+  kinds?: NodeKind[]
+  /** 只會出現在這些角色的節點上 */
   roles?: NodeRole[]
   icon: string
   /** 一句話說明（對應文件的弱點描述） */
@@ -114,14 +116,12 @@ export interface CardDef {
   cond?: string
   /** 效果 */
   effect: string
-  /** 偵查方式標籤 */
-  mode?: 'active' | 'passive'
   trivia: string
   /** node：要拖到目標節點上；auto：拖到場上任何位置即可 */
   targeting: 'node' | 'auto'
 }
 
-export type MissionId = 'ransom' | 'espionage' | 'bossfraud' | 'airebel' | 'sabotage'
+export type MissionId = 'ransom' | 'espionage' | 'bossfraud' | 'insiderleak' | 'sabotage'
 
 export interface MissionDef {
   id: MissionId
@@ -157,8 +157,8 @@ export interface Slot {
   vuln: VulnId
   /** true 代表這是「已防護」牌 */
   shield: boolean
-  /** 0 蓋著／1 只有駭客知道／2 公開（公司也看得到） */
-  vis: 0 | 1 | 2
+  /** 0 蓋著／2 公開（公司也看得到） */
+  vis: 0 | 2
   /** 弱點已被公司修補 */
   fixed: boolean
   /** 公開的弱點：公司修復的倒數（回合） */
@@ -220,6 +220,8 @@ export interface GameState {
   discard: CardInst[]
   turn: number
   ap: number
+  /** 本回合是否實際出牌或換牌；首回合不能直接空過。 */
+  actedThisTurn: boolean
   apBase: number
   apBonus: number
   /** 上回合沒用完、保留到這回合的行動點 */

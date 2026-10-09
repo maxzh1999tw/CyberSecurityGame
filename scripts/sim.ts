@@ -5,12 +5,14 @@
 import { CARDS, CARD_IDS } from '../src/game/data.ts'
 import {
   CARD_COPIES,
+  HAND_MAX,
   cardCost,
   endOfTurn,
   newGame,
   node,
   playCard,
   playability,
+  recaptureSpeedOf,
   recycleCard,
   routeExists,
   startHackerTurn,
@@ -53,6 +55,12 @@ function bestChoice(s: GameState): Choice | null {
       } else if (def.cat === 'action') {
         sc = o.tri === 'Y' ? 100 - noise * 6 : s.alert <= 3 && noise <= 2 ? 30 - noise * 8 : 0
         if (c.id === 'lateral' && o.tri === 'M') sc -= 10
+        // 已控制的目標快被奪回時才延長，避免電腦玩家反覆續控而不推進任務。
+        const target = o.target ?? (c.id === 'usb' ? 'infra' : c.id === 'inject' || c.id === 'skill' ? 'ai' : null)
+        if (c.id !== 'lateral' && target && node(s, target).controlled) {
+          const n = node(s, target)
+          sc = o.tri === 'Y' && n.timer <= 2 * recaptureSpeedOf(s, n) ? 55 - noise * 6 : 0
+        }
       } else if (def.cat === 'paralyze') {
         const needWipe = s.mission === 'ransom' && c.id === 'wipe'
         const needAlarm = s.mission === 'sabotage' && c.id === 'alarm'
@@ -107,13 +115,16 @@ function playGame(seed: number, scenario: ScenarioId, mission?: MissionId, log?:
     while (s.phase === 'hacker' && acts++ < 20) {
       const ch = bestChoice(s)
       if (!ch) {
-        // 手上有死牌就換掉
+        // 死牌優先換掉；滿手又沒有值得出的牌時，也能換掉暫時不需要的續控牌。
         const dead = s.hand.filter((c) => {
           const d = CARDS[c.id]
           return playability(s, c.id).status === 'dead' && d.cat !== 'finish'
         })
-        if (dead.length >= 2 && s.ap >= 1) {
-          recycleCard(s, dead[0].uid)
+        const replace = dead.length >= 2
+          ? dead[0]
+          : s.hand.length >= HAND_MAX ? s.hand.find((c) => CARDS[c.id].cat !== 'finish') : undefined
+        if (replace && s.ap >= 1) {
+          recycleCard(s, replace.uid)
           continue
         }
         break
@@ -154,7 +165,7 @@ if (process.argv[3] === 'show') {
 
 const N = Number(process.argv[2] ?? 400)
 const scenarios: ScenarioId[] = ['factory', 'startup', 'hospital', 'school']
-const missions: MissionId[] = ['ransom', 'espionage', 'bossfraud', 'airebel', 'sabotage']
+const missions: MissionId[] = ['ransom', 'espionage', 'bossfraud', 'insiderleak', 'sabotage']
 const tot = { w: 0, n: 0, turns: 0, timeout: 0, toRoute: 0, lose: 0, stuck: 0 }
 const byM: Record<string, { w: number; n: number }> = {}
 const byS: Record<string, { w: number; n: number }> = {}

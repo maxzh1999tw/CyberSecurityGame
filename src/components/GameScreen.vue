@@ -13,6 +13,7 @@ import HandArea from './HandArea.vue'
 import HelpOverlay from './HelpOverlay.vue'
 import IntroOverlay from './IntroOverlay.vue'
 import MissionPanel from './MissionPanel.vue'
+import MobileInfoPopover from './MobileInfoPopover.vue'
 import StageTrack from './StageTrack.vue'
 import NodeTip from './NodeTip.vue'
 import PlayerHud from './PlayerHud.vue'
@@ -27,6 +28,7 @@ const zone = computed(() => {
 })
 
 function onKey(e: KeyboardEvent) {
+  if (ui.help) return
   if (e.code === 'Space') {
     e.preventDefault()
     if (!e.repeat) {
@@ -62,6 +64,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
     <ResultOverlay />
     <CoachOverlay />
     <HelpOverlay />
+    <MobileInfoPopover />
   </div>
 </template>
 
@@ -128,5 +131,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   display: flex;
   justify-content: center;
   z-index: 12;
+}
+
+@media (pointer: coarse) and (orientation: landscape) and (max-width: 1000px) {
+  /* Scope geometry to the board component root, never CompanyPanel's .board. */
+  .game > :deep(.board) {
+    top: 78px;
+    bottom: 172px;
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) and (max-width: 1000px) and (max-height: 430px) {
+  .rail.left {
+    padding-top: 10px;
+    gap: 8px;
+  }
+  .rail.right {
+    padding-top: 10px;
+    gap: 8px;
+  }
+  .game > :deep(.board) {
+    top: 64px;
+    bottom: 156px;
+  }
 }
 </style>

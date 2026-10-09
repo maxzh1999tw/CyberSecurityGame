@@ -6,12 +6,13 @@ import { missionGoals } from '../game/progress'
 import { game, registerAnchor } from '../game/store'
 import Icon from './Icon.vue'
 
+const props = defineProps<{ detail?: boolean }>()
 const m = computed(() => (game.s ? MISSIONS[game.s.mission] : null))
 const goals = computed(() => (game.s ? missionGoals(game.s) : []))
 </script>
 
 <template>
-  <div v-if="m" :ref="(el) => registerAnchor('mission', el as HTMLElement | null)" class="mission">
+  <div v-if="m" :ref="(el) => !props.detail && registerAnchor('mission', el as HTMLElement | null)" class="mission">
     <div class="tag">本局任務</div>
     <div class="head">
       <div class="badge"><Icon :name="m.icon" :size="36" :stroke="1.8" /></div>

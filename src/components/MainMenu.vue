@@ -231,4 +231,40 @@ footer {
   color: #fff;
   border-color: var(--gold);
 }
+
+@media (pointer: coarse) and (orientation: landscape) and (max-width: 1000px) {
+  .menu {
+    gap: 40px;
+    padding: max(12px, calc(env(safe-area-inset-top, 0px) / var(--stage-scale)))
+      max(18px, calc(env(safe-area-inset-right, 0px) / var(--stage-scale)))
+      max(20px, calc(env(safe-area-inset-bottom, 0px) / var(--stage-scale)))
+      max(18px, calc(env(safe-area-inset-left, 0px) / var(--stage-scale)));
+  }
+  .corner {
+    top: max(12px, calc(env(safe-area-inset-top, 0px) / var(--stage-scale)));
+    right: max(18px, calc(env(safe-area-inset-right, 0px) / var(--stage-scale)));
+    gap: 8px;
+  }
+  .corner button {
+    width: 128px;
+    height: 128px;
+  }
+  .corner button :deep(svg) {
+    width: 44px;
+    height: 44px;
+  }
+  footer {
+    bottom: max(20px, calc(env(safe-area-inset-bottom, 0px) / var(--stage-scale)));
+  }
+  .chip {
+    min-height: 120px;
+    height: auto;
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) and (max-width: 1000px) and (max-height: 430px) {
+  .menu {
+    gap: 24px;
+  }
+}
 </style>

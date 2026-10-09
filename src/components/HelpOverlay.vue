@@ -19,22 +19,22 @@ const pages = [
   {
     icon: 'crosshair',
     title: '拖曳出牌',
-    lines: ['拖到場上，或拖到目標身上。', '綠色一定成功，黃色要賭。'],
+    lines: ['拖到場上，或拖到目標身上。綠色一定成功，黃色要賭。', '控制外圍可攻擊內網；控制內網可攻擊核心。可達後仍須符合卡牌條件。', '開局只能偵查外圍；控制外圍可偵查內網，控制內網可偵查核心。同層控制也能偵查。'],
   },
   {
     icon: 'volume-2',
     title: '噪音',
-    lines: ['每張牌都會讓警戒值上升。', '安靜的回合，警戒值會降 1。'],
+    lines: ['噪音大於 0 的牌會提高警戒值。', '整回合噪音不超過 2，警戒值會降 1。'],
   },
   {
     icon: 'building-2',
     title: '公司的倒數',
-    lines: ['公開的弱點、被控制的節點都會倒數，', '歸零就被修復、奪回。癱瘓 IT 可以暫停。'],
+    lines: ['翻開的弱點都會公開並開始修復倒數。', '再次成功控制，可累加控制時間；癱瘓 IT 可暫停倒數。'],
   },
   {
     icon: 'layers',
     title: '抽牌與行動點',
-    lines: ['每回合抽 2 張牌，手牌最多 8 張。', '沒用完的行動點，最多保留 2 點到下一回合。'],
+    lines: ['開局拿 8 張手牌；每回合抽 2 張，手牌最多 8 張。', '沒用完的行動點，最多保留 2 點到下一回合。'],
   },
   {
     icon: 'recycle',
@@ -60,7 +60,7 @@ function close() {
         <div class="demo">
           <template v-if="page === 1">
             <div class="slot hid"><span>?</span></div>
-            <div class="slot vul"><Icon name="mouse-pointer-click" :size="22" :stroke="2.3" />好奇寶寶<b class="mk priv"><Icon name="ghost" :size="16" :stroke="2.6" /></b></div>
+            <div class="slot vul"><Icon name="mouse-pointer-click" :size="22" :stroke="2.3" />好奇寶寶<b class="mk"><Icon name="eye" :size="16" :stroke="2.6" /></b></div>
             <div class="slot none"><span>—</span>沒有更多弱點</div>
           </template>
           <template v-else-if="page === 2">
@@ -68,8 +68,7 @@ function close() {
             <div class="ar maybe"><i></i>要賭一把</div>
           </template>
           <template v-else-if="page === 4">
-            <div class="vis pub"><b class="mk"><Icon name="eye" :size="18" :stroke="2.6" /></b>公開：公司看得到，開始倒數修復</div>
-            <div class="vis priv"><b class="mk"><Icon name="ghost" :size="18" :stroke="2.6" /></b>隱密：只有你知道</div>
+            <div class="vis pub"><b class="mk"><Icon name="eye" :size="18" :stroke="2.6" /></b>已揭露：公司看得到，開始倒數修復</div>
           </template>
         </div>
 
@@ -97,6 +96,8 @@ function close() {
   position: relative;
   width: 780px;
   min-height: 620px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
   padding: 46px 50px 38px;
   border-radius: 22px;
   display: flex;
@@ -201,9 +202,6 @@ p {
   color: #fff;
   background: #c8402f;
 }
-.mk.priv {
-  background: #2f9a6c;
-}
 .ar {
   display: flex;
   align-items: center;
@@ -233,9 +231,6 @@ p {
 }
 .vis .mk {
   margin: 0;
-}
-.vis.priv .mk {
-  background: #2f9a6c;
 }
 .nav {
   margin-top: auto;
@@ -287,5 +282,43 @@ p {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+@media (max-width: 800px) {
+  .help {
+    padding: 12px;
+    overflow-y: auto;
+  }
+  .panel {
+    width: min(780px, 100%);
+    min-height: min(620px, calc(100dvh - 24px));
+    padding: 30px 24px 24px;
+    gap: 9px;
+    border-width: 4px;
+  }
+  .ico {
+    width: 84px;
+    height: 84px;
+  }
+  .ico :deep(svg) {
+    width: 56px;
+    height: 56px;
+  }
+  h2 {
+    font-size: clamp(30px, 7vw, 42px);
+    letter-spacing: 4px;
+    text-indent: 4px;
+  }
+  p {
+    font-size: clamp(18px, 4vw, 23px);
+    line-height: 1.45;
+  }
+  .demo {
+    min-height: 96px;
+    margin-top: 4px;
+  }
+  .nav button {
+    width: 56px;
+    height: 56px;
+  }
 }
 </style>

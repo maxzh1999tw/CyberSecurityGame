@@ -27,10 +27,6 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
       <div class="pat"></div>
       <Icon :name="def.icon" :size="82" :stroke="1.6" class="art-icon" />
       <div class="stage">{{ def.stage }}</div>
-      <div v-if="def.mode" class="mode" :class="def.mode">
-        <Icon :name="def.mode === 'active' ? 'eye' : 'ghost'" :size="16" :stroke="2.4" />
-        {{ def.mode === 'active' ? '公開' : '隱密' }}
-      </div>
     </div>
 
     <div class="name">{{ def.name }}</div>
@@ -123,26 +119,6 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
   color: var(--gold2);
   background: rgba(8, 12, 20, 0.62);
 }
-.mode {
-  position: absolute;
-  right: 8px;
-  bottom: 7px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 9px 1px 6px;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 900;
-  color: #fff;
-}
-.mode.active {
-  background: #b23a2c;
-}
-.mode.passive {
-  background: #2c8f66;
-}
-
 .name {
   position: absolute;
   left: 0;

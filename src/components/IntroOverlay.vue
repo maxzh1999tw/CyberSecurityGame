@@ -88,7 +88,8 @@ const sc = computed(() => (game.s ? SCENARIOS[game.s.scenario] : null))
   animation: slide-in-left 0.6s cubic-bezier(0.2, 0.9, 0.3, 1) both;
 }
 .mi {
-  animation: card-flip 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.1) 0.25s both;
+  /* 只在延遲時套用翻轉起始畫面；動畫結束後回到無 transform 的清晰靜態卡片。 */
+  animation: card-flip 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.1) 0.25s backwards;
 }
 .band {
   align-self: stretch;
@@ -224,5 +225,14 @@ p {
 }
 .fade-leave-to {
   opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .co,
+  .mi,
+  .go {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 </style>

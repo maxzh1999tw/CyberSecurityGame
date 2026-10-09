@@ -4,17 +4,33 @@ import GameScreen from './components/GameScreen.vue'
 import MainMenu from './components/MainMenu.vue'
 import QuizScreen from './components/QuizScreen.vue'
 import ReviewScreen from './components/ReviewScreen.vue'
+import MobileOrientation from './components/MobileOrientation.vue'
 import { fitStage, game, view } from './game/store'
 
-// 舞台高度固定 1080，寬度跟著視窗延伸，整個畫面都用得到
+// 使用可見的 CSS viewport。行動裝置模擬或瀏覽器工具列可能令
+// window.innerWidth 大於實際 viewport，不能讓未縮放舞台反過來撐大頁面。
+function readViewport() {
+  const visual = window.visualViewport
+  const width = visual?.width || document.documentElement.clientWidth || window.innerWidth
+  const height = visual?.height || document.documentElement.clientHeight || window.innerHeight
+  return { width, height }
+}
+
 function fit() {
-  fitStage(window.innerWidth, window.innerHeight)
+  const { width, height } = readViewport()
+  fitStage(width, height)
 }
 onMounted(() => {
   fit()
   window.addEventListener('resize', fit)
+  window.addEventListener('orientationchange', fit)
+  window.visualViewport?.addEventListener('resize', fit)
 })
-onBeforeUnmount(() => window.removeEventListener('resize', fit))
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', fit)
+  window.removeEventListener('orientationchange', fit)
+  window.visualViewport?.removeEventListener('resize', fit)
+})
 </script>
 
 <template>
@@ -23,6 +39,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', fit))
     :style="{
       width: view.w + 'px',
       height: view.h + 'px',
+      '--stage-scale': String(view.scale),
       transform: `translate(${view.left}px, ${view.top}px) scale(${view.scale})`,
     }"
     @contextmenu.prevent
@@ -32,6 +49,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', fit))
     <QuizScreen v-else-if="game.screen === 'quiz'" />
     <ReviewScreen v-else />
   </div>
+  <MobileOrientation />
 </template>
 
 <style>

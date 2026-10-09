@@ -71,7 +71,7 @@ const cards = computed<CardItem[]>(() => {
   }
   for (const e of used.value) add(e, { text: '你利用過', tone: 'used' })
   for (const e of critical.value) add(e, { text: '關鍵', tone: 'key' })
-  for (const e of seen.value) if (!map.has(e.node + ':' + e.vuln)) add(e, { text: '你看過', tone: 'seen' })
+  for (const e of seen.value) if (!map.has(e.node + ':' + e.vuln)) add(e, { text: '已揭露', tone: 'seen' })
   return [...map.values()].slice(0, 8)
 })
 

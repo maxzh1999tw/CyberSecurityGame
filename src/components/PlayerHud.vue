@@ -1,20 +1,24 @@
 <script setup lang="ts">
 // 下方：駭客頭像、行動點（左）／牌堆、結束回合（右）
 import { computed, nextTick, ref, watch } from 'vue'
-import { RECYCLE_COST, canRecycle } from '../game/engine'
+import { RECYCLE_COST, canEndTurn as engineCanEndTurn, canRecycle, isMissionCard } from '../game/engine'
 import { endTurn, game, playerHasMoves, registerAnchor, ui } from '../game/store'
 import Icon from './Icon.vue'
 
 const s = computed(() => game.s!)
 // 行動點總數：基本 + 員工加成 + 上回合保留的，或是這回合臨時多拿的
 const total = computed(() => Math.max(s.value.apBase + s.value.apBonus + s.value.apCarry, s.value.ap))
-const canEnd = computed(() => !ui.busy && s.value.phase === 'hacker')
+const activeTurn = computed(() => !ui.busy && s.value.phase === 'hacker')
+const canEndState = computed(() => engineCanEndTurn(s.value))
+const canEnd = computed(() => activeTurn.value && canEndState.value)
+const firstTurnLocked = computed(() => activeTurn.value && !canEndState.value)
 // 手牌全部打不出去：有行動點就提示「換牌」，沒有才提示「結束回合」
-const noMoves = computed(() => canEnd.value && !playerHasMoves(s.value))
+const noMoves = computed(() => activeTurn.value && !playerHasMoves(s.value))
 const nudgeRecycle = computed(() => noMoves.value && canRecycle(s.value))
-const suggest = computed(() => noMoves.value && !nudgeRecycle.value)
+const suggest = computed(() => canEnd.value && noMoves.value && !nudgeRecycle.value)
 const dragging = computed(() => !!ui.drag && ui.drag.moved)
-const recyclable = computed(() => dragging.value && canRecycle(s.value))
+const protectedCard = computed(() => !!ui.drag && isMissionCard(s.value, ui.drag.id))
+const recyclable = computed(() => dragging.value && !protectedCard.value && canRecycle(s.value))
 const overPile = computed(() => dragging.value && !!ui.drag?.overPile)
 
 const shaking = ref(false)
@@ -75,6 +79,7 @@ watch(
           <i v-if="s.discard.length > 1"></i>
           <div class="face"><Icon :name="dragging || nudgeRecycle ? 'recycle' : 'history'" :size="34" :stroke="2" /></div>
           <b v-if="!dragging && !nudgeRecycle">{{ s.discard.length }}</b>
+          <span v-else-if="protectedCard" class="cost"><Icon name="lock" :size="15" />任務保留</span>
           <span v-else class="cost">換牌 -{{ RECYCLE_COST }}<Icon name="zap" :size="15" :stroke="2.8" /></span>
         </div>
       </div>
@@ -83,6 +88,8 @@ watch(
         class="end"
         :class="{ suggest, off: !canEnd }"
         :disabled="!canEnd"
+        :title="firstTurnLocked ? '首回合請先出牌或換牌' : undefined"
+        :aria-label="firstTurnLocked ? '首回合請先出牌或換牌' : undefined"
         @click="endTurn"
       >
         結束回合

@@ -1,7 +1,7 @@
 // 遊戲畫面的狀態與操作：把規則引擎和動畫串在一起
 import { reactive } from 'vue'
 import { sfx } from '../audio/sfx'
-import { BACKUP_RESTORE_TURNS, CARDS, IT_PARALYZE_TURNS, SCENARIO_IDS, VULNS } from './data'
+import { BACKUP_RESTORE_TURNS, CARDS, IT_PARALYZE_TURNS, recaptureTurnsOf, SCENARIO_IDS, VULNS } from './data'
 import * as E from './engine'
 import type { Playability, StepOutcome } from './engine'
 import type { CardId, GameState, MissionId, ScenarioId, Tri } from './types'
@@ -28,6 +28,7 @@ export interface Rect {
 export interface DragState {
   uid: number
   id: CardId
+  pointerId: number
   mode: 'node' | 'auto'
   x: number
   y: number
@@ -128,6 +129,7 @@ export const ui = reactive({
   recycling: null as number | null,
   hoverCard: null as number | null,
   hoverNode: null as string | null,
+  hoverSlot: null as { nodeId: string; idx: number } | null,
   hoverAlert: false,
   nodeFx: {} as Record<string, string>,
   slotFx: {} as Record<string, string>,
@@ -293,6 +295,7 @@ export function startGame() {
   ui.recycling = null
   ui.hoverCard = null
   ui.hoverNode = null
+  ui.hoverSlot = null
   ui.nodeFx = {}
   ui.slotFx = {}
   ui.floaters = []
@@ -353,35 +356,59 @@ export function playerHasMoves(s: GameState): boolean {
 export function deadReason(s: GameState, id: CardId): string {
   const infra = E.node(s, 'infra')
   const db = E.node(s, 'db')
-  const ai = E.node(s, 'ai')
   const boss = E.node(s, 'boss')
+  const canReveal = (n: (typeof s.nodes)[number]) => E.canRecon(s, n) && !n.sealed && E.hiddenIdx(n).length > 0
+  const hasLockedReveal = (onlyEmployees = false) =>
+    s.nodes.some((n) => (!onlyEmployees || E.isEmployee(n)) && !E.canRecon(s, n) && !n.sealed && E.hiddenIdx(n).length > 0)
+  const revealReason = (onlyEmployees = false) => {
+    if (s.nodes.some((n) => (!onlyEmployees || E.isEmployee(n)) && canReveal(n))) return '已經沒有可偵查的目標'
+    return hasLockedReveal(onlyEmployees)
+      ? '弱點所在層尚未開放偵查；先控制前一層節點'
+      : '已經沒有蓋著的牌可以揭露'
+  }
   switch (id) {
     case 'virus':
-      return infra.virus ? '病毒已經在運作' : '需要先控制基礎設施'
+      return infra.virus ? '病毒已經在運作' : '需要先控制基礎設施與任一員工'
     case 'alarm':
+      return E.node(s, 'it').paralyzed > 1 ? 'IT 管理員仍在癱瘓中' : '需要基礎設施與員工入口，請查看牌面前置條件'
     case 'wipe':
-      return infra.controlled ? '對方已經癱瘓了' : '需要先控制基礎設施'
+      return E.node(s, 'backup').paralyzed > 0 ? '備份已經癱瘓' : '尚未取得破壞備份所需的入口或權限，請查看牌面條件'
     case 'ransom':
-      return '需要先控制資料庫'
+      return db.controlled ? '備份仍可還原；控制或癱瘓備份，或揭露「破釜沉舟」' : '需要先控制資料庫'
     case 'exfil':
-      return '需要先控制 AI 助理'
+      return '需要先控制一名員工與資料庫'
     case 'wreck':
       return infra.controlled ? 'IT 管理員還能應變：先控制他，或同回合癱瘓他' : '需要先控制基礎設施'
     case 'bec':
-      return boss.controlled ? '沒有可能受騙的員工' : '需要先控制主管'
+      if (!infra.controlled && !boss.controlled) return '需要先控制基礎設施與主管'
+      if (!infra.controlled) return '需要先控制基礎設施'
+      if (!boss.controlled) return '需要先控制主管'
+      return '沒有可攻擊且有「好騙」弱點的員工'
     case 'lateral':
-      return db.controlled ? '資料庫已經是你的了' : '還碰不到核心層'
+      return '選擇已控制節點；同層或下方一層須有未控制節點'
     case 'brute':
     case 'exploit':
+    case 'cred':
+      return '目前沒有可攻擊且符合弱點條件的目標；先建立入口或尋找其他目標'
     case 'usb':
-      return infra.controlled ? '基礎設施已經是你的了' : '碰不到基礎設施，或已確認沒有可用的弱點'
+      return '需要先控制一名員工'
     case 'inject':
+      return `需要控制 IT，或 AI 有「${VULNS.obey.name}」／「${VULNS.nohuman.name}」弱點`
     case 'skill':
-      return ai.controlled ? 'AI 助理已經是你的了' : '已確認沒有可用的弱點'
+      return `需要控制員工，或 AI 有「${VULNS.selfupd.name}」弱點`
     case 'scan':
-    case 'ally':
+      return revealReason()
     case 'osint':
-    case 'smooth':
+      return revealReason(true)
+    case 'smooth': {
+      const hasControlledEmployee = s.nodes.some((n) => E.isEmployee(n) && n.controlled)
+      const reconEmployees = s.nodes.filter(
+        (n) => E.isEmployee(n) && E.canRecon(s, n) && !n.sealed && E.hiddenIdx(n).length > 0,
+      )
+      if (hasControlledEmployee || reconEmployees.length === 0) return revealReason(true)
+      return `可偵查員工都沒有「${VULNS.gullible.name}」或「${VULNS.oversharer.name}」弱點`
+    }
+    case 'ally':
       return '已經沒有蓋著的牌可以揭露'
     case 'wipelog':
     case 'proxy':
@@ -433,6 +460,7 @@ function updateDrag(ev: PointerEvent) {
 }
 
 function onMove(ev: PointerEvent) {
+  if (ui.drag && ev.pointerId !== ui.drag.pointerId) return
   updateDrag(ev)
 }
 
@@ -442,13 +470,20 @@ function endDragListeners() {
   window.removeEventListener('pointercancel', onCancel)
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('contextmenu', onCtx)
-  window.removeEventListener('blur', onCancel)
+  window.removeEventListener('blur', onBlur)
 }
 
-function onCancel() {
+function onCancel(ev?: PointerEvent) {
+  if (ev && ui.drag && ev.pointerId !== ui.drag.pointerId) return
   if (ui.drag?.moved) sfx.cancel()
   ui.drag = null
   endDragListeners()
+}
+function onBlur() {
+  onCancel()
+}
+export function cancelPointerDrag() {
+  onCancel()
 }
 function onKey(ev: KeyboardEvent) {
   if (ev.key === 'Escape') onCancel()
@@ -460,6 +495,7 @@ function onCtx(ev: Event) {
 
 function onUp(ev: PointerEvent) {
   const d = ui.drag
+  if (d && ev.pointerId !== d.pointerId) return
   const s = game.s
   endDragListeners()
   if (!d || !s) {
@@ -484,6 +520,10 @@ function onUp(ev: PointerEvent) {
       return
     }
     if (!pb.targets[d.overNode]) {
+      if (E.reachKnown(s, E.node(s, d.overNode)) !== 'Y') {
+        deny('目標尚未解鎖，請先建立入口')
+        return
+      }
       deny(pb.status === 'dead' ? deadReason(s, d.id) : '這個目標不能用')
       return
     }
@@ -511,22 +551,24 @@ function denyAp() {
   toast('行動點不足')
 }
 
-export function pointerDownCard(uid: number, ev: PointerEvent) {
+export function pointerDownCard(uid: number, ev: PointerEvent, current: PointerEvent = ev) {
   const s = game.s
   if (!s || ui.busy || s.phase !== 'hacker' || ev.button !== 0) return
   const inst = s.hand.find((c) => c.uid === uid)
   if (!inst) return
   sfx.unlock()
-  const p = toStage(ev.clientX, ev.clientY)
+  const start = toStage(ev.clientX, ev.clientY)
+  const p = toStage(current.clientX, current.clientY)
   const pb = E.playability(s, inst.id)
   ui.drag = {
     uid,
     id: inst.id,
+    pointerId: ev.pointerId,
     mode: CARDS[inst.id].targeting,
     x: p.x,
     y: p.y,
-    sx: p.x,
-    sy: p.y,
+    sx: start.x,
+    sy: start.y,
     moved: false,
     overNode: null,
     overPile: false,
@@ -534,12 +576,15 @@ export function pointerDownCard(uid: number, ev: PointerEvent) {
     pb,
   }
   ui.hoverCard = null
+  ui.hoverNode = null
+  ui.hoverSlot = null
   window.addEventListener('pointermove', onMove)
   window.addEventListener('pointerup', onUp)
   window.addEventListener('pointercancel', onCancel)
   window.addEventListener('keydown', onKey)
   window.addEventListener('contextmenu', onCtx)
-  window.addEventListener('blur', onCancel)
+  window.addEventListener('blur', onBlur)
+  if (current.clientX !== ev.clientX || current.clientY !== ev.clientY) updateDrag(current)
 }
 
 // ───────────────────────── 出牌與演出 ─────────────────────────
@@ -673,11 +718,22 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
 
   if (ef.ok) {
     if (ef.captured.length) {
+      if (r.card === 'lateral' && r.target) {
+        const source = nodeRect(r.target)
+        for (const id of ef.captured) {
+          const destination = nodeRect(id)
+          if (source && destination) beam(source.cx, source.cy, destination.cx, destination.cy)
+        }
+        await wait(420)
+      }
       sfx.capture()
+      const extended = new Set(ef.extended)
       for (const id of ef.captured) {
         flashNode(id, 'capture', 1500)
         const used = found.get(id)
-        notes.set(id, { title: '控制!', sub: used ? `利用${quote(used)}` : undefined, tone: 'good', icon: 'skull', style: 'stamp' })
+        notes.set(id, extended.has(id)
+          ? { title: '控制延長', sub: `倒數 +${recaptureTurnsOf(E.node(s, id).role)}`, tone: 'good', icon: 'skull', style: 'stamp' }
+          : { title: '控制!', sub: used ? `利用${quote(used)}` : undefined, tone: 'good', icon: 'skull', style: 'stamp' })
       }
       for (const [id, list] of found) {
         if (!notes.has(id)) notes.set(id, { title: '利用捷徑', sub: quote(list), tone: 'gold', icon: 'door-open', style: 'tag' })
@@ -848,6 +904,9 @@ export function recycle(uid: number) {
 async function recycleInner(uid: number) {
   const s = game.s
   if (!s || ui.busy) return
+  const inst = s.hand.find((c) => c.uid === uid)
+  if (!inst) return
+  if (E.isMissionCard(s, inst.id)) return deny('任務關鍵牌已保留，不能換掉；達成條件後即可打出')
   if (!E.canRecycle(s)) return denyAp()
   ui.busy = true
   ui.recycling = uid
@@ -873,9 +932,12 @@ export function endTurn() {
 async function endTurnInner() {
   const s = game.s
   if (!s || ui.busy || s.phase !== 'hacker') return
+  if (!E.canEndTurn(s)) return deny('首回合請先出牌或換牌')
   ui.busy = true
   ui.drag = null
   ui.hoverCard = null
+  ui.hoverNode = null
+  ui.hoverSlot = null
   sfx.endTurn()
   ui.speed = 1
   await wait(350)

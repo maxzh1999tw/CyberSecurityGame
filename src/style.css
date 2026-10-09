@@ -87,6 +87,18 @@ body,
   -webkit-user-select: none;
 }
 
+/* Keep the scaled stage inside a viewport-sized root. Its unscaled 1920px
+   layout must never contribute to the mobile layout viewport dimensions. */
+#app {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  overflow: hidden;
+  contain: layout size;
+  isolation: isolate;
+}
+
 button {
   font: inherit;
   color: inherit;
@@ -163,6 +175,116 @@ svg {
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .05 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
 }
 
+/* 手機橫向只調整安全區與可捲內容，舞台仍維持原始比例。 */
+@media (pointer: coarse) and (orientation: landscape) and (max-width: 1000px) {
+  html,
+  body,
+  #app {
+    overscroll-behavior: none;
+  }
+
+  .csg-stage .game .rail.left {
+    padding-left: max(20px, calc(env(safe-area-inset-left, 0px) / var(--stage-scale)));
+    padding-top: max(16px, calc(env(safe-area-inset-top, 0px) / var(--stage-scale)));
+  }
+  .csg-stage .game .rail.right {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding-right: max(20px, calc(env(safe-area-inset-right, 0px) / var(--stage-scale)));
+    padding-top: max(16px, calc(env(safe-area-inset-top, 0px) / var(--stage-scale)));
+  }
+
+  .csg-stage .intro .center {
+    width: min(1800px, calc(92vw / var(--stage-scale)));
+    height: calc(100dvh / var(--stage-scale));
+    max-height: 100%;
+    min-height: 0;
+    gap: 18px;
+    padding: max(12px, calc(env(safe-area-inset-top, 0px) / var(--stage-scale))) 0
+      max(12px, calc(env(safe-area-inset-bottom, 0px) / var(--stage-scale)));
+  }
+  .csg-stage .intro .cards {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    gap: 24px;
+    overflow: hidden;
+  }
+  .csg-stage .intro .card {
+    flex: 1 1 0;
+    width: auto;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .csg-stage .intro .card > * {
+    flex-shrink: 0;
+  }
+  .csg-stage .intro .card p,
+  .csg-stage .intro .card .goal {
+    font-size: calc(13px / var(--stage-scale));
+    line-height: 1.55;
+  }
+  .csg-stage .intro .card .chip {
+    font-size: calc(11px / var(--stage-scale));
+  }
+  .csg-stage .intro .go {
+    flex: 0 0 auto;
+    min-height: 120px;
+  }
+  .csg-stage .help .panel {
+    width: min(1680px, calc(92vw / var(--stage-scale)));
+    min-height: 0;
+    max-height: calc(92dvh / var(--stage-scale));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 36px 46px;
+  }
+  .csg-stage .help .panel p {
+    font-size: calc(14px / var(--stage-scale));
+    line-height: 1.5;
+  }
+  .csg-stage .help .panel .ico {
+    width: 90px;
+    height: 90px;
+  }
+  .csg-stage .help .panel h2 {
+    margin: 0;
+    font-size: calc(20px / var(--stage-scale));
+  }
+  .csg-stage .help .panel .x,
+  .csg-stage .help .panel .nav button {
+    width: calc(44px / var(--stage-scale));
+    height: calc(44px / var(--stage-scale));
+    flex-shrink: 0;
+  }
+  .csg-stage .help .panel .nav button svg,
+  .csg-stage .help .panel .x svg {
+    width: calc(20px / var(--stage-scale));
+    height: calc(20px / var(--stage-scale));
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) and (max-width: 1000px) and (max-height: 430px) {
+  .csg-stage .game .rail.left,
+  .csg-stage .game .rail.right {
+    padding-top: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hc,
+  .card-preview-shell,
+  .card-preview-scrim {
+    scroll-behavior: auto;
+  }
+  .hc {
+    transition: none !important;
+  }
+}
 /* 出牌演出：牌燒毀的進度 */
 @property --burn {
   syntax: '<percentage>';

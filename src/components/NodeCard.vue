@@ -2,7 +2,7 @@
 // 公司裡的一個節點（員工、AI、設備、資料……）
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { VULNS } from '../game/data'
-import { etaOf, isImpregnable, reachKnown, recaptureBlock, repairBlock, speedOf } from '../game/engine'
+import { etaOf, isImpregnable, reachKnown, recaptureBlock, recaptureSpeedOf, repairBlock, speedOf } from '../game/engine'
 import { game, registerNode, ui } from '../game/store'
 import type { GameNode, VulnId } from '../game/types'
 import Icon from './Icon.vue'
@@ -12,7 +12,10 @@ const props = defineProps<{ node: GameNode }>()
 const el = ref<HTMLElement | null>(null)
 
 onMounted(() => registerNode(props.node.id, el.value))
-onBeforeUnmount(() => registerNode(props.node.id, null))
+onBeforeUnmount(() => {
+  leave()
+  registerNode(props.node.id, null)
+})
 
 const KIND_LABEL = { employee: '員工', infra: '設備', ai: 'AI', data: '資料' } as const
 const KIND_ICON = { employee: 'user-round', infra: 'server', ai: 'cpu', data: 'database' } as const
@@ -29,10 +32,12 @@ const BUGS = Array.from({ length: 8 }, (_, i) => {
 
 const ability = computed(() => {
   const nd = n.value
+  if (nd.role === 'boss') return { icon: 'crown', text: '−1' }
   if (nd.kind === 'employee' && nd.role !== 'it') return { icon: 'zap', text: '+1' }
   if (nd.role === 'it') return { icon: 'wrench', text: '' }
   if (nd.role === 'infra') return { icon: 'bug', text: '' }
   if (nd.role === 'ai') return { icon: 'sparkles', text: '' }
+  if (nd.role === 'backup') return { icon: 'database-backup', text: '' }
   return null
 })
 
@@ -40,7 +45,7 @@ const ability = computed(() => {
 const speed = computed(() => (game.s ? speedOf(game.s) : 1))
 const rFrozen = computed(() => !!game.s && repairBlock(game.s) !== null)
 const cFrozen = computed(() => !!game.s && recaptureBlock(game.s) !== null)
-const recapEta = computed(() => etaOf(n.value.timer, speed.value))
+const recapEta = computed(() => etaOf(n.value.timer, game.s ? recaptureSpeedOf(game.s, n.value) : speed.value))
 const restoreEta = computed(() => etaOf(n.value.paralyzed, speed.value))
 
 const locked = computed(() => {
@@ -53,7 +58,7 @@ interface SlotView {
   state: 'hidden' | 'vuln' | 'struck' | 'shield' | 'fixed' | 'wall'
   name: string
   icon: string
-  vis: 0 | 1 | 2
+  vis: 0 | 2
   kind: string
   fx: string
   /** 公開的弱點：公司修復的倒數（回合） */
@@ -67,7 +72,7 @@ const slots = computed<SlotView[]>(() =>
   n.value.slots.map((sl, idx) => {
     const d = VULNS[sl.vuln]
     const fx = ui.slotFx[n.value.id + ':' + idx] ?? ''
-    if (idx === wallIdx.value) return { idx, state: 'wall', name: '無懈可擊', icon: 'shield-check', vis: 1, kind: d.kind, fx, eta: 0 }
+    if (idx === wallIdx.value) return { idx, state: 'wall', name: '無懈可擊', icon: 'shield-check', vis: 2, kind: d.kind, fx, eta: 0 }
     if (sl.vis === 0) return { idx, state: 'hidden', name: '', icon: '', vis: 0, kind: d.kind, fx, eta: 0 }
     if (sl.shield)
       return { idx, state: 'shield', name: d.shield, icon: 'shield-check', vis: sl.vis, kind: d.kind, fx, eta: 0 }
@@ -82,7 +87,7 @@ const slots = computed<SlotView[]>(() =>
       vis: sl.vis,
       kind: d.kind,
       fx,
-      eta: sl.vis === 2 && sl.timer !== undefined ? etaOf(sl.timer, speed.value) : 0,
+      eta: sl.timer !== undefined ? etaOf(sl.timer, speed.value) : 0,
     }
   }),
 )
@@ -106,11 +111,26 @@ const dragClass = computed(() => {
   return 'drag-quiet'
 })
 
-function enter() {
-  if (!ui.drag) ui.hoverNode = n.value.id
+function enter(ev: PointerEvent) {
+  if (ui.drag) return
+  if (ev.pointerType === 'touch') {
+    ui.hoverNode = null
+    ui.hoverSlot = null
+    return
+  }
+  const slotEl = ev.target instanceof Element ? ev.target.closest<HTMLElement>('[data-slot-index]') : null
+  if (slotEl && el.value?.contains(slotEl)) {
+    const slot = slots.value[Number(slotEl.dataset.slotIndex)]
+    ui.hoverNode = null
+    ui.hoverSlot = slot && slot.state !== 'hidden' ? { nodeId: n.value.id, idx: slot.idx } : null
+  } else {
+    ui.hoverSlot = null
+    ui.hoverNode = n.value.id
+  }
 }
 function leave() {
   if (ui.hoverNode === n.value.id) ui.hoverNode = null
+  if (ui.hoverSlot?.nodeId === n.value.id) ui.hoverSlot = null
 }
 </script>
 
@@ -118,13 +138,14 @@ function leave() {
   <div
     ref="el"
     class="node"
+    :data-node-id="n.id"
     :class="[
       'kind-' + n.kind,
       dragClass,
       ui.nodeFx[n.id] ? 'fx-' + ui.nodeFx[n.id] : '',
       { ctrl: n.controlled, para: n.paralyzed > 0, locked, infected: n.virus && n.controlled },
     ]"
-    @pointerenter="enter"
+    @pointerover="enter"
     @pointerleave="leave"
   >
     <div class="head">
@@ -152,7 +173,12 @@ function leave() {
           <span v-if="n.virus && n.controlled" class="pill virus"><Icon name="bug" :size="14" :stroke="2.6" />病毒</span>
         </div>
       </div>
-      <div v-if="ability" class="ability" :class="{ on: n.controlled && (n.role !== 'infra' || n.virus) }">
+      <div
+        v-if="ability"
+        class="ability"
+        :class="{ on: n.controlled && (n.role !== 'infra' || n.virus) && (n.role !== 'backup' || n.paralyzed <= 0) }"
+        :title="n.role === 'backup' ? '控制且未癱瘓時阻礙系統奪回；每回合多抽 1 張' : undefined"
+      >
         <Icon :name="ability.icon" :size="18" :stroke="2.4" />
         <b v-if="ability.text">{{ ability.text }}</b>
         <i v-if="n.role === 'it'" class="slash"></i>
@@ -169,6 +195,7 @@ function leave() {
         v-for="s in slots"
         :key="s.idx"
         class="slot"
+        :data-slot-index="s.idx"
         :class="['st-' + s.state, 'k-' + s.kind, s.fx ? 'sfx-' + s.fx : '', { sealed: s.state === 'hidden' && n.sealed }]"
       >
         <template v-if="s.state === 'hidden'">
@@ -179,12 +206,10 @@ function leave() {
           <span class="sname">{{ s.name }}</span>
           <span
             v-if="s.state === 'vuln' || s.state === 'struck'"
-            class="mark"
-            :class="s.vis === 2 ? 'pub' : 'priv'"
-            :title="s.vis === 2 ? '公司看得到：倒數歸零就會被修復' : '只有你知道'"
+            class="mark pub"
           >
-            <Icon :name="s.vis === 2 ? 'eye' : 'ghost'" :size="15" :stroke="2.6" />
-            <template v-if="s.vis === 2 && s.eta">
+            <Icon name="eye" :size="15" :stroke="2.6" />
+            <template v-if="s.eta">
               <Icon v-if="rFrozen" name="snowflake" :size="14" :stroke="2.6" />
               <b v-else :key="s.eta">{{ s.eta }}</b>
             </template>
@@ -530,9 +555,6 @@ function leave() {
 }
 .mark.pub {
   background: #c8402f;
-}
-.mark.priv {
-  background: #2f9a6c;
 }
 .mark.fix {
   background: #3d6fa8;
@@ -1112,5 +1134,16 @@ function leave() {
 }
 .st-fixed .sic {
   color: #2a5c9a;
+}
+
+/* 拖曳提示要壓過已控制／感染狀態，讓已控制來源仍清楚可選 */
+.node.drag-sure,
+.node.drag-maybe {
+  border-color: var(--tg);
+  outline: 3px solid var(--tg);
+  outline-offset: 2px;
+}
+.node.drag-over {
+  outline-width: 5px;
 }
 </style>
