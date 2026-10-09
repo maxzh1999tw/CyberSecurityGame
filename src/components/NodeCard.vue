@@ -46,7 +46,8 @@ const speed = computed(() => (game.s ? speedOf(game.s) : 1))
 const rFrozen = computed(() => !!game.s && repairBlock(game.s) !== null)
 const cFrozen = computed(() => !!game.s && recaptureBlock(game.s) !== null)
 const recapEta = computed(() => etaOf(n.value.timer, game.s ? recaptureSpeedOf(game.s, n.value) : speed.value))
-const restoreEta = computed(() => etaOf(n.value.paralyzed, speed.value))
+const restorePaused = computed(() => n.value.role === 'backup' && rFrozen.value)
+const restoreEta = computed(() => n.value.role === 'infra' ? n.value.paralyzed : etaOf(n.value.paralyzed, speed.value))
 
 const locked = computed(() => {
   if (!game.s || n.value.layer === 0 || n.value.controlled) return false
@@ -143,7 +144,7 @@ function leave() {
       'kind-' + n.kind,
       dragClass,
       ui.nodeFx[n.id] ? 'fx-' + ui.nodeFx[n.id] : '',
-      { ctrl: n.controlled, para: n.paralyzed > 0, locked, infected: n.virus && n.controlled },
+      { ctrl: n.controlled, para: n.paralyzed > 0, locked, infected: n.virus && n.controlled && n.paralyzed <= 0 },
     ]"
     @pointerover="enter"
     @pointerleave="leave"
@@ -167,16 +168,18 @@ function leave() {
             <Icon name="snowflake" :size="14" :stroke="2.6" />癱瘓
             <template v-if="n.role === 'it'"> {{ n.paralyzed }} 回</template>
             <span v-else class="eta" :key="restoreEta">
-              <Icon :name="rFrozen ? 'snowflake' : 'timer'" :size="14" :stroke="2.6" />{{ rFrozen ? '' : restoreEta }}
+              <Icon :name="restorePaused ? 'snowflake' : 'timer'" :size="14" :stroke="2.6" />{{ restorePaused ? '' : restoreEta }}
             </span>
           </span>
-          <span v-if="n.virus && n.controlled" class="pill virus"><Icon name="bug" :size="14" :stroke="2.6" />病毒</span>
+          <span v-if="n.virus && n.controlled" class="pill virus" :class="{ paused: n.paralyzed > 0 }">
+            <Icon name="bug" :size="14" :stroke="2.6" />{{ n.paralyzed > 0 ? '病毒暫停' : '病毒' }}
+          </span>
         </div>
       </div>
       <div
         v-if="ability"
         class="ability"
-        :class="{ on: n.controlled && (n.role !== 'infra' || n.virus) && (n.role !== 'backup' || n.paralyzed <= 0) }"
+        :class="{ on: n.controlled && (n.role !== 'infra' || (n.virus && n.paralyzed <= 0)) && (n.role !== 'backup' || n.paralyzed <= 0) }"
         :title="n.role === 'backup' ? '控制且未癱瘓時阻礙系統奪回；每回合多抽 1 張' : undefined"
       >
         <Icon :name="ability.icon" :size="18" :stroke="2.4" />
@@ -383,6 +386,10 @@ function leave() {
 .pill.virus {
   background: #2f6e55;
   border: 1.5px solid var(--good2);
+}
+.pill.virus.paused {
+  background: #3f6f8d;
+  border-color: #bfe4f8;
 }
 .ability {
   position: absolute;

@@ -31,7 +31,7 @@ export const VULNS: Record<VulnId, VulnDef> = {
     name: '工作習慣很差',
     kind: 'employee',
     icon: 'monitor-off',
-    desc: '離開座位不鎖螢幕、下班電腦不關機',
+    desc: '離開座位不鎖螢幕，讓他人有機會操作公司電腦',
     shield: '已啟用自動鎖定螢幕',
     fix: '螢幕自動鎖定、下班登出或關機',
     tomorrow: '離開座位按 Win+L',
@@ -369,9 +369,9 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 1,
     noise: 1,
     icon: 'drama',
-    cond: '目標員工有{v:gullible}或{v:approver}',
+    cond: '目標員工有{v:gullible}或{v:oversharer}',
     effect: '控制目標',
-    trivia: '社交工程會利用信任、權威感，也可能趁疲勞讓人誤批登入請求',
+    trivia: '攻擊者利用信任，或根據公開的工作資訊編出可信的話術，誘使員工交出存取權；敏感要求應另行查證',
     targeting: 'node',
   }),
   cred: c({
@@ -408,9 +408,9 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 1,
     noise: 1,
     icon: 'door-open',
-    cond: '目標員工有{v:lazy}或{v:kind}',
-    effect: '控制目標',
-    trivia: '離開座位按 Win+L 只要一秒鐘',
+    cond: '目標員工有{v:kind}；基礎設施已開放',
+    effect: '各半機率控制基礎設施，或癱瘓它 2 回合',
+    trivia: '趁員工替陌生人開門進入設備區，可能接管或中斷設備；中斷期間公司修復與奪回暫停。訪客應自行驗證身分',
     targeting: 'node',
   }),
   mfa: c({
@@ -460,9 +460,9 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 2,
     noise: 2,
     icon: 'usb',
-    cond: '已控制員工',
+    cond: '已控制員工，或可接觸的員工有{v:lazy}',
     effect: '控制基礎設施',
-    trivia: '先控制員工帳號，再利用其公司電腦執行 USB 載荷',
+    trivia: '利用受控員工端，或無人看守且未鎖定的電腦植入惡意程式，建立基礎設施入口；離席應鎖屏，陌生 USB 不要插',
     targeting: 'auto',
   }),
   exploit: c({
@@ -849,6 +849,8 @@ export const ZONE_SPEED = [1, 1.5, 2] as const
 
 /** 癱瘓 IT 管理員的回合數 */
 export const IT_PARALYZE_TURNS = 2
+/** 基礎設施中斷時，公司應變暫停的回合數 */
+export const INFRA_PARALYZE_TURNS = 2
 /** 備份被破壞後，公司需要幾回合才能恢復 */
 export const BACKUP_RESTORE_TURNS = 6
 
@@ -889,8 +891,9 @@ export function recaptureName(entry: VulnId | null): string {
     case 'gullible':
       return '員工發現被騙，IT 奪回帳號'
     case 'lazy':
+      return 'IT 鎖定暴露的工作站，奪回控制權'
     case 'kind':
-      return 'IT 發現可疑登入，奪回帳號'
+      return '公司封鎖實體入侵入口，IT 奪回設備'
     case 'weakpw':
       return '發現設備遭暴力破解，IT 重設密碼'
     case 'buggy':

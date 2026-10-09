@@ -4,7 +4,7 @@ import { CARDS, MISSION_IDS, MISSIONS, SCENARIO_IDS, NODE_RISK, recaptureTurnsOf
 import {
   HAND_MAX, OPENING_HAND, apBonusOf, backupUnavailable, canEndTurn, canHave, canRecon, canRecycle, cardCost, ctrlCount, dbAccess, drawCards, effective, endOfTurn, endTurn,
   hintNodes, holdNeeded, isFree, isMissionCard, knownHas, newGame, startHackerTurn,
-  node, playCard, playability, predict, reachKnown, recaptureSpeedOf, recycleCard, resolve, routeExists, speedOf, upcoming, uselessCards,
+  node, playCard, playability, predict, reachKnown, recaptureBlock, recaptureSpeedOf, recycleCard, repairBlock, resolve, routeExists, speedOf, upcoming, uselessCards,
 } from '../src/game/engine.ts'
 import type { CardId, GameState, MissionId, NodeRole, VulnId } from '../src/game/types.ts'
 
@@ -45,18 +45,40 @@ function play(s: GameState, id: CardId, target?: string) {
   return playCard(s, uid, target)
 }
 
-test('全部企業與任務：起手滿八張、唯一任務牌在手上、配置仍可通關', () => {
-  assert.equal(OPENING_HAND, 8)
+test('全部企業與任務：起手六張、唯一任務牌包含在內、配置仍可通關', () => {
+  assert.equal(OPENING_HAND, 6)
   assert.equal(HAND_MAX, 8)
   assert.ok(!MISSION_IDS.some((id) => String(id) === 'airebel'))
+  const employeeEntries: CardId[] = ['phish', 'social', 'cred', 'mfa', 'brute', 'exploit']
+  const ready = (s: GameState, id: CardId) => {
+    const state = playability(s, id)
+    return state.affordable && state.status !== 'dead'
+  }
   for (const scenario of SCENARIO_IDS) {
     for (const mission of MISSION_IDS) {
       for (let seed = 1; seed <= 20; seed++) {
         const s = newGame({ seed, scenario, mission })
-        assert.equal(s.hand.length, 8, `${scenario}/${mission}/${seed}`)
+        assert.equal(s.hand.length, 6, `${scenario}/${mission}/${seed}`)
         assert.equal(routeExists(s), true, `${scenario}/${mission}/${seed} 無解`)
         const cards = [...s.hand, ...s.deck, ...s.discard]
         assert.equal(new Set(cards.map((c) => c.uid)).size, cards.length)
+        assert.ok(
+          s.hand.some((c) => CARDS[c.id].cat === 'recon' && ready(s, c.id) && playability(s, c.id).status === 'sure'),
+          `${scenario}/${mission}/${seed} 起手缺少確定可出的偵查牌`,
+        )
+        const poolHasEmployeeEntry = cards.some((c) => employeeEntries.includes(c.id) && ready(s, c.id))
+        const openingEntry = s.hand.find((c) => employeeEntries.includes(c.id) && ready(s, c.id))
+        if (poolHasEmployeeEntry) {
+          assert.ok(openingEntry, `${scenario}/${mission}/${seed} 牌池有可用員工入侵牌但起手沒有`)
+          const state = playability(s, openingEntry!.id)
+          assert.equal(state.status, 'maybe', '未揭露的弱點仍應是盲猜，開局保底不保證命中')
+          assert.ok(Object.values(state.targets).includes('M'), '保底入侵牌應保留未知目標的 M 預測')
+        } else {
+          assert.ok(
+            s.hand.some((c) => CARDS[c.id].cat === 'action' && ready(s, c.id)),
+            `${scenario}/${mission}/${seed} 沒有可用員工入侵牌時，起手仍需一張可用行動牌`,
+          )
+        }
         const finisher = MISSIONS[mission].finisher
         if (finisher) {
           assert.equal(s.hand.filter((c) => c.id === finisher).length, 1)
@@ -69,6 +91,24 @@ test('全部企業與任務：起手滿八張、唯一任務牌在手上、配�
         assert.ok(cards.every((c) => CARDS[c.id].cat !== 'finish' || c.id === finisher))
       }
     }
+  }
+})
+
+test('六張起手之後照常補兩張到八張上限，不另外加發任務牌', () => {
+  for (const mission of MISSION_IDS) {
+    const s = newGame({ seed: 92, mission })
+    const first = s.hand.map((c) => c.uid)
+    assert.equal(first.length, 6)
+    // 已驗證首回合不能空過；此處只檢查抽牌的容量，保留六張觀察補牌。
+    s.actedThisTurn = true
+    endTurn(s)
+    assert.equal(s.turn, 2)
+    assert.equal(s.hand.length, 8)
+    assert.ok(first.every((uid) => s.hand.some((c) => c.uid === uid)))
+    assert.equal(drawCards(s, 2).length, 0)
+    assert.equal(new Set(s.hand.map((c) => c.uid)).size, 8)
+    const finisher = MISSIONS[mission].finisher
+    if (finisher) assert.equal(s.hand.filter((c) => c.id === finisher).length, 1)
   }
 })
 
@@ -144,7 +184,7 @@ test('反覆換普通牌、棄牌重洗後，任務關鍵牌仍保留', () => {
       s.ap = 3
       const disposable = s.hand.find((c) => !isMissionCard(s, c.id))!
       assert.ok(recycleCard(s, disposable.uid))
-      assert.equal(s.hand.length, 8)
+      assert.equal(s.hand.length, 6)
       assert.ok(s.hand.some((c) => c.uid === required.uid))
       assert.ok(!s.deck.some((c) => c.uid === required.uid))
       assert.ok(!s.discard.some((c) => c.uid === required.uid))
@@ -461,6 +501,169 @@ test('基礎設施卡需要跨節點前置，不會拿到就能成功', () => {
   assert.equal(predict(s, 'wipe'), 'Y')
 })
 
+test('USB 需要已開放基礎設施，且已控員工或可達員工的 lazy 替代路線一致', () => {
+  const locked = world()
+  weakness(locked, 'sales', 'lazy')
+  assert.equal(predict(locked, 'usb'), 'N', '有 lazy 也不能指定未開放的基礎設施')
+  const usbCard = { uid: ++locked.uidSeq, id: 'usb' as const }
+  locked.hand.push(usbCard)
+  const beforeLockedPlay = JSON.stringify(locked)
+  assert.throws(() => playCard(locked, usbCard.uid), /目標尚未解鎖/)
+  assert.equal(JSON.stringify(locked), beforeLockedPlay, '鎖定時拒絕出牌不消耗手牌或資源')
+
+  const guessed = world()
+  weakness(guessed, 'infra', 'remote')
+  weakness(guessed, 'sales', 'lazy')
+  node(guessed, 'sales').slots[0]!.vis = 0
+  delete node(guessed, 'sales').slots[0]!.timer
+  assert.equal(reachKnown(guessed, node(guessed, 'infra')), 'Y')
+  assert.equal(predict(guessed, 'usb'), 'M', '已開放基建後，隱藏 lazy 是可賭的入口')
+  assert.equal(playability(guessed, 'usb').status, 'maybe')
+  const guessedPlay = play(guessed, 'usb')
+  assert.equal(guessedPlay.effect.ok, true)
+  assert.deepEqual(guessedPlay.effect.entry, { node: 'sales', vuln: 'lazy' })
+  assert.equal(node(guessed, 'sales').controlled, false, 'USB 只控制基礎設施，不控制提供入口的員工')
+  assert.equal(node(guessed, 'infra').controlled, true)
+  assert.equal(node(guessed, 'sales').slots[0]!.vis, 2, '使用的 lazy 入口公開並開始修補')
+
+  const missedGuess = world()
+  weakness(missedGuess, 'infra', 'remote')
+  weakness(missedGuess, 'sales', 'curious')
+  node(missedGuess, 'sales').slots[0]!.vis = 0
+  delete node(missedGuess, 'sales').slots[0]!.timer
+  assert.equal(predict(missedGuess, 'usb'), 'M', '未知員工弱點不能提前洩漏是否有 lazy')
+  const failedGuess = play(missedGuess, 'usb')
+  assert.equal(failedGuess.effect.ok, false)
+  assert.equal(node(missedGuess, 'infra').controlled, false)
+  assert.equal(node(missedGuess, 'sales').controlled, false)
+  assert.equal(node(missedGuess, 'sales').slots[0]!.vis, 0, '錯猜不會洩漏未使用弱點')
+  assert.equal(missedGuess.ap, 20 - failedGuess.cost)
+  assert.equal(missedGuess.alert, failedGuess.noise)
+
+  const knownFirst = world()
+  weakness(knownFirst, 'infra', 'remote')
+  weakness(knownFirst, 'sales', 'lazy')
+  weakness(knownFirst, 'engineer', 'lazy')
+  node(knownFirst, 'sales').slots[0]!.vis = 0
+  delete node(knownFirst, 'sales').slots[0]!.timer
+  assert.equal(predict(knownFirst, 'usb'), 'Y', '已有已知 lazy 時可預測穩定成功')
+  const usedKnown = play(knownFirst, 'usb')
+  assert.deepEqual(usedKnown.effect.entry, { node: 'engineer', vuln: 'lazy' }, '已知有效入口優先於隱藏入口')
+  assert.equal(node(knownFirst, 'sales').slots[0]!.vis, 0, '未使用的隱藏 lazy 不應被揭露')
+})
+
+test('尾隨只影響基礎設施：成功接管或癱瘓兩回合，且未開放基建時不能選目標', () => {
+  const locked = world('sabotage')
+  weakness(locked, 'sales', 'kind')
+  assert.equal(reachKnown(locked, node(locked, 'infra')), 'N')
+  assert.equal(predict(locked, 'tail', 'sales'), 'N')
+  assert.ok(!('sales' in playability(locked, 'tail').targets))
+  const tailCard = { uid: ++locked.uidSeq, id: 'tail' as const }
+  locked.hand.push(tailCard)
+  const beforeLockedPlay = JSON.stringify(locked)
+  assert.throws(() => playCard(locked, tailCard.uid, 'sales'), /目標尚未解鎖/)
+  assert.equal(JSON.stringify(locked), beforeLockedPlay, '鎖定時拒絕出牌不消耗手牌或資源')
+  assert.equal(node(locked, 'sales').controlled, false)
+
+  const outcomes = new Set<'capture' | 'paralyze'>()
+  let frozenState: GameState | null = null
+  for (let seed = 1; seed <= 80; seed++) {
+    const s = world('sabotage')
+    weakness(s, 'sales', 'kind', 'curious')
+    node(s, 'sales').slots[0]!.vis = 0
+    delete node(s, 'sales').slots[0]!.timer
+    weakness(s, 'infra', 'remote')
+    weakness(s, 'it', 'weakpw')
+    node(s, 'infra').slots[0]!.vis = 2
+    s.rng = seed * 7919
+    assert.equal(reachKnown(s, node(s, 'infra')), 'Y')
+    assert.equal(predict(s, 'tail', 'sales'), 'M', '未知 kind 可盲猜，但不能顯示成確定命中')
+    const result = play(s, 'tail', 'sales')
+    assert.equal(result.effect.ok, true)
+    assert.equal(node(s, 'sales').controlled, false, '尾隨不能控制員工')
+    assert.equal(node(s, 'sales').slots[0]!.vis, 2, '尾隨入口弱點公開並開始修補')
+    assert.equal(node(s, 'sales').slots[0]!.timer, repairTurnsOf('kind'))
+    if (result.effect.captured.includes('infra')) {
+      outcomes.add('capture')
+      assert.deepEqual(result.effect.captured, ['infra'])
+      assert.equal(node(s, 'infra').controlled, true)
+      assert.deepEqual(node(s, 'infra').entry, { node: 'sales', vuln: 'kind' })
+      assert.equal(node(s, 'infra').paralyzed, 0)
+    } else {
+      outcomes.add('paralyze')
+      assert.deepEqual(result.effect.captured, [])
+      assert.equal(result.effect.paralyzed, 'infra')
+      assert.equal(node(s, 'infra').controlled, false, '癱瘓不能算成控制或任務完成')
+      assert.equal(node(s, 'infra').paralyzed, 2)
+      assert.equal(result.win, false)
+      assert.equal(s.result, null)
+      assert.equal(predict(s, 'virus'), 'N', '癱瘓中的基建仍未受控')
+      frozenState ??= s
+    }
+  }
+  assert.deepEqual(outcomes, new Set(['capture', 'paralyze']), '固定亂數種子應能覆蓋兩種尾隨結果')
+
+  assert.ok(frozenState)
+  const s = frozenState!
+  // 證明基礎設施癱瘓時，員工控制倒數與公開弱點修復同時暫停。
+  control(s, 'boss')
+  node(s, 'boss').timer = 4
+  const kind = node(s, 'sales').slots[0]!
+  kind.vis = 2
+  kind.timer = 3
+  assert.equal(repairBlock(s), 'infraParalyzed')
+  assert.equal(recaptureBlock(s), 'infraParalyzed')
+  assert.equal(upcoming(s).find((u) => u.kind === 'recapture' && u.node === 'boss')?.frozen, true)
+  assert.equal(upcoming(s).find((u) => u.kind === 'repair' && u.node === 'sales')?.frozen, true)
+  for (const remaining of [1, 0]) {
+    const steps = Array.from(endOfTurn(s))
+    assert.ok(steps.some((step) => step.t === 'frozen' && step.reason === 'infraParalyzed'))
+    assert.equal(node(s, 'boss').timer, 4)
+    assert.equal(kind.timer, 3)
+    assert.equal(node(s, 'infra').paralyzed, remaining)
+    if (s.phase !== 'over') startHackerTurn(s)
+  }
+  if (s.phase !== 'over') startHackerTurn(s)
+  const resumed = Array.from(endOfTurn(s))
+  assert.ok(!resumed.some((step) => step.t === 'frozen' && step.reason === 'infraParalyzed'))
+  assert.equal(node(s, 'boss').timer, 3)
+  assert.equal(kind.timer, 2)
+})
+
+test('尾隨再次接管可延長基礎設施控制，入口仍來自員工 kind', () => {
+  let capturedState: GameState | null = null
+  let captureSeed = 0
+  for (let seed = 1; seed <= 80; seed++) {
+    const s = world('sabotage')
+    weakness(s, 'sales', 'kind', 'curious')
+    node(s, 'sales').slots[0]!.vis = 0
+    delete node(s, 'sales').slots[0]!.timer
+    weakness(s, 'infra', 'remote')
+    node(s, 'infra').slots[0]!.vis = 2
+    s.rng = seed * 7919
+    const result = play(s, 'tail', 'sales')
+    if (result.effect.captured.includes('infra')) {
+      capturedState = s
+      captureSeed = seed * 7919
+      break
+    }
+  }
+  assert.ok(capturedState, '測試種子應涵蓋尾隨的接管分支')
+  const s = capturedState!
+  const infra = node(s, 'infra')
+  assert.equal(infra.controlled, true)
+  assert.deepEqual(infra.entry, { node: 'sales', vuln: 'kind' })
+  assert.equal(node(s, 'sales').controlled, false)
+  infra.timer = 1.25
+  s.rng = captureSeed
+  const repeated = play(s, 'tail', 'sales')
+  assert.equal(repeated.effect.ok, true)
+  assert.deepEqual(repeated.effect.captured, ['infra'])
+  assert.deepEqual(repeated.effect.extended, ['infra'])
+  assert.equal(infra.timer, 1.25 + recaptureTurnsOf('infra'))
+  assert.equal(node(s, 'sales').controlled, false, '再次尾隨也不控制提供入口的員工')
+})
+
 test('主管以權限核准取代行動點加成，一般員工仍各加一點', () => {
   const s = world()
   control(s, 'boss')
@@ -579,12 +782,17 @@ test('橫向移動依畫面向下擴散：內網只能選內網或外圍，不�
 
 test('共用弱點支援多張卡，偵查額外效果與成功入侵紀錄一致', () => {
   const s = world()
-  weakness(s, 'sales', 'approver')
+  weakness(s, 'sales', 'oversharer', 'approver')
   assert.equal(predict(s, 'mfa', 'sales'), 'Y')
   assert.equal(predict(s, 'social', 'sales'), 'Y')
   const social = play(s, 'social', 'sales')
   assert.equal(social.effect.ok, true)
-  assert.deepEqual(node(s, 'sales').entry, { node: 'sales', vuln: 'approver' })
+  assert.deepEqual(node(s, 'sales').entry, { node: 'sales', vuln: 'oversharer' })
+
+  const approver = world()
+  weakness(approver, 'sales', 'approver')
+  assert.equal(predict(approver, 'mfa', 'sales'), 'Y')
+  assert.equal(predict(approver, 'social', 'sales'), 'N', '登入核准疲勞仍由 MFA 卡處理')
 
   const intel = world()
   weakness(intel, 'engineer', 'oversharer', 'curious', 'samepw')
@@ -615,8 +823,7 @@ test('同樣未知的兩個節點不因暗牌內容而洩露命中答案', () =>
 })
 
 const alternativeEntries = [
-  ['social', 'sales', 'gullible', 'approver'],
-  ['tail', 'sales', 'lazy', 'kind'],
+  ['social', 'sales', 'gullible', 'oversharer'],
   ['brute', 'sales', 'weakpw', 'samepw'],
   ['exploit', 'sales', 'buggy', 'legacy'],
   ['inject', 'ai', 'obey', 'nohuman'],
@@ -949,7 +1156,7 @@ test('控制備份在所有任務每回合多抽一張；癱瘓、失控與滿�
 test('直接控制牌可再次對已控制目標出牌，累加時長且照常支付費用與噪音', () => {
   const cases: Array<[CardId, string, VulnId | null]> = [
     ['phish', 'boss', 'curious'], ['social', 'boss', 'gullible'], ['cred', 'boss', 'samepw'],
-    ['tail', 'boss', 'lazy'], ['mfa', 'boss', 'approver'],
+    ['mfa', 'boss', 'approver'],
     ...(['sales', 'it', 'infra', 'db', 'backup'] as const).map((target): [CardId, string, VulnId] => ['brute', target, 'weakpw']),
     ...(['engineer', 'it', 'infra', 'db', 'backup'] as const).map((target): [CardId, string, VulnId] => ['exploit', target, 'buggy']),
     ['inject', 'ai', 'obey'], ['skill', 'ai', 'selfupd'], ['usb', 'infra', null],

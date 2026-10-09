@@ -18,10 +18,20 @@ const zone = computed(() => alertZone(s.value.alert))
 const speed = computed(() => speedOf(s.value))
 
 const it = computed(() => node(s.value, 'it'))
-const itState = computed(() => {
-  if (it.value.paralyzed > 0) return { tone: 'ice', icon: 'snowflake', text: `癱瘓中 ${it.value.paralyzed} 回合`, sub: '修復與奪回全部暫停' }
-  if (it.value.controlled) return { tone: 'mine', icon: 'skull', text: '被你控制', sub: '公司無法修復弱點' }
-  return { tone: 'ok', icon: 'wrench', text: '正常運作', sub: '' }
+const infra = computed(() => node(s.value, 'infra'))
+const blockState = computed(() => {
+  if (infra.value.paralyzed > 0) {
+    return {
+      tone: 'ice',
+      icon: 'snowflake',
+      title: '公司網路',
+      text: `中斷中 ${infra.value.paralyzed} 回合`,
+      sub: '修復與奪回暫停',
+    }
+  }
+  if (it.value.paralyzed > 0) return { tone: 'ice', icon: 'snowflake', title: 'IT 管理員', text: `癱瘓中 ${it.value.paralyzed} 回合`, sub: '修復與奪回全部暫停' }
+  if (it.value.controlled) return { tone: 'mine', icon: 'skull', title: 'IT 管理員', text: '被你控制', sub: '公司無法修復弱點' }
+  return { tone: 'ok', icon: 'wrench', title: 'IT 管理員', text: '正常運作', sub: '' }
 })
 
 const list = computed(() =>
@@ -68,11 +78,11 @@ const total = computed(() => upcoming(s.value).length)
       </div>
     </div>
 
-    <div class="it" :class="itState.tone">
-      <Icon :name="itState.icon" :size="26" :stroke="2.2" />
+    <div class="it" :class="blockState.tone">
+      <Icon :name="blockState.icon" :size="26" :stroke="2.2" />
       <div class="rt">
-        <b>IT 管理員</b>
-        <span>{{ itState.text }}{{ itState.sub ? '・' + itState.sub : '' }}</span>
+        <b>{{ blockState.title }}</b>
+        <span>{{ blockState.text }}{{ blockState.sub ? '・' + blockState.sub : '' }}</span>
       </div>
     </div>
 

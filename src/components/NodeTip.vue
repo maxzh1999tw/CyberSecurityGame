@@ -63,6 +63,13 @@ const ABILITY: Record<string, { icon: string; text: string }> = {
   db: { icon: 'crown', text: '多數任務的關鍵' },
   backup: { icon: 'database-backup', text: '阻礙系統奪回；未癱瘓時每回合多抽 1 張' },
 }
+const abilityText = computed(() => {
+  const n = node.value
+  if (!n) return ''
+  return n.role === 'infra' && n.paralyzed > 0
+    ? '網路中斷：公司修復與奪回暫停'
+    : ABILITY[n.role].text
+})
 
 const speed = computed(() => (game.s ? speedOf(game.s) : 1))
 const repairFrozen = computed(() => !!game.s && repairBlock(game.s) !== null)
@@ -172,7 +179,7 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
       </div>
       <div class="ab" :class="{ on: node.controlled }">
         <Icon :name="ABILITY[node.role].icon" :size="22" :stroke="2.3" />
-        <span>控制後：{{ ABILITY[node.role].text }}</span>
+        <span>{{ node.role === 'infra' && node.paralyzed > 0 ? abilityText : `控制後：${abilityText}` }}</span>
       </div>
       <div v-if="controlTimer" class="nr">
         <Icon name="timer" :size="20" :stroke="2.4" />

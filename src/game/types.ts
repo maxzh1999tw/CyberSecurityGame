@@ -186,7 +186,7 @@ export interface GameNode {
   sealed: boolean
   /** 駭客當初用來入侵的弱點 */
   entry: Entry | null
-  /** 癱瘓：剩餘回合數（0 代表沒有癱瘓）。IT 管理員每回合 -1；備份要等公司修復 */
+  /** 癱瘓：剩餘回合數（0 代表沒有癱瘓）。IT 與基礎設施每回合 -1；備份要等公司修復 */
   paralyzed: number
   /** 基礎設施專用：賽博病毒運作中 */
   virus: boolean

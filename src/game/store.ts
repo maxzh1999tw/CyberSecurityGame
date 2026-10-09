@@ -1,7 +1,7 @@
 // 遊戲畫面的狀態與操作：把規則引擎和動畫串在一起
 import { reactive } from 'vue'
 import { sfx } from '../audio/sfx'
-import { BACKUP_RESTORE_TURNS, CARDS, IT_PARALYZE_TURNS, recaptureTurnsOf, SCENARIO_IDS, VULNS } from './data'
+import { BACKUP_RESTORE_TURNS, CARDS, INFRA_PARALYZE_TURNS, IT_PARALYZE_TURNS, recaptureTurnsOf, SCENARIO_IDS, VULNS } from './data'
 import * as E from './engine'
 import type { Playability, StepOutcome } from './engine'
 import type { CardId, GameState, MissionId, ScenarioId, Tri } from './types'
@@ -391,7 +391,11 @@ export function deadReason(s: GameState, id: CardId): string {
     case 'cred':
       return '目前沒有可攻擊且符合弱點條件的目標；先建立入口或尋找其他目標'
     case 'usb':
-      return '需要先控制一名員工'
+      if (E.reachKnown(s, infra) !== 'Y') return '基礎設施尚未開放；先控制外圍節點或揭露通往它的捷徑'
+      return '需要先控制員工，或嘗試可接觸且離席未鎖屏的員工端'
+    case 'tail':
+      if (E.reachKnown(s, infra) !== 'Y') return '基礎設施尚未開放；先控制外圍節點或揭露通往它的捷徑'
+      return `需要選擇有「${VULNS.kind.name}」弱點的員工`
     case 'inject':
       return `需要控制 IT，或 AI 有「${VULNS.obey.name}」／「${VULNS.nohuman.name}」弱點`
     case 'skill':
@@ -655,7 +659,8 @@ async function commitPlayInner(uid: number, targetId?: string, from?: CastSpec['
 
   // 飛行的終點：目標節點；不用選目標的牌，飛向它實際影響的節點
   const ef = preview?.effect
-  const aimId = targetId ?? ef?.captured[0] ?? ef?.paralyzed ?? ef?.revealed[0]?.node ?? E.hintNodes(s, id)[0] ?? null
+  const tailResultId = id === 'tail' && ef?.ok ? ef.captured[0] ?? ef.paralyzed : null
+  const aimId = tailResultId ?? targetId ?? ef?.captured[0] ?? ef?.paralyzed ?? ef?.revealed[0]?.node ?? E.hintNodes(s, id)[0] ?? null
   const aimRect = SUPPORT_AIM[id] ? anchorRect(SUPPORT_AIM[id]!) : aimId ? nodeRect(aimId) : null
   const tx = aimRect ? aimRect.cx : boardCenter()
   const ty = aimRect ? aimRect.cy : 420
@@ -673,7 +678,7 @@ async function commitPlayInner(uid: number, targetId?: string, from?: CastSpec['
     card: id,
     from: from ?? { x: boardCenter(), y: view.h - 190, scale: 0.8 },
     to: { x: tx, y: ty },
-    theme: themeOf(id),
+    theme: id === 'tail' && ef?.paralyzed ? 'frost' : themeOf(id),
     outcome,
     onHit: async () => {
       const r = E.playCard(s, uid, targetId)
@@ -738,12 +743,16 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
       for (const [id, list] of found) {
         if (!notes.has(id)) notes.set(id, { title: '利用捷徑', sub: quote(list), tone: 'gold', icon: 'door-open', style: 'tag' })
       }
-    } else if (def.cat === 'paralyze' && ef.paralyzed) {
+    } else if (ef.paralyzed) {
       sfx.paralyze()
       flashNode(ef.paralyzed, 'paralyze', 1500)
       notes.set(ef.paralyzed, {
-        title: '癱瘓',
-        sub: ef.paralyzed === 'it' ? `修復與奪回暫停 ${IT_PARALYZE_TURNS} 回合` : `約 ${BACKUP_RESTORE_TURNS} 回合後才會恢復`,
+        title: ef.paralyzed === 'infra' ? '網路中斷' : '癱瘓',
+        sub: ef.paralyzed === 'it'
+          ? `修復與奪回暫停 ${IT_PARALYZE_TURNS} 回合`
+          : ef.paralyzed === 'infra'
+            ? `修復與奪回暫停 ${INFRA_PARALYZE_TURNS} 回合`
+            : `約 ${BACKUP_RESTORE_TURNS} 回合後才會恢復`,
         tone: 'ice',
         icon: 'snowflake',
         style: 'stamp',
@@ -969,11 +978,16 @@ async function presentStep(step: StepOutcome) {
   const s = game.s!
   switch (step.t) {
     case 'frozen': {
-      const it = nodeRect('it')
-      if (it) {
-        plaque(it.cx, it.cy - 6, {
+      const infraPaused = step.reason === 'infraParalyzed'
+      const anchor = nodeRect(infraPaused ? 'infra' : 'it')
+      if (anchor) {
+        plaque(anchor.cx, anchor.cy - 6, {
           title: step.both ? '公司全面停擺' : '修復暫停',
-          sub: step.both ? 'IT 管理員被癱瘓：修復與奪回都停了' : 'IT 管理員被你控制',
+          sub: infraPaused
+            ? '網路中斷：修復與奪回都停了'
+            : step.both
+              ? 'IT 管理員被癱瘓：修復與奪回都停了'
+              : 'IT 管理員被你控制',
           tone: 'ice',
           icon: 'snowflake',
           style: 'tag',
