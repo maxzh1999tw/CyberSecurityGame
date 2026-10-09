@@ -11,29 +11,37 @@ const sc = computed(() => (game.s ? SCENARIOS[game.s.scenario] : null))
 
 <template>
   <Transition name="fade">
-    <div v-if="ui.intro && m && sc" class="intro">
+    <div v-if="ui.intro && m && sc" class="intro" role="dialog" aria-modal="true" aria-label="開場介紹">
       <div class="veil"></div>
-      <div class="center">
+      <main class="center">
         <div class="cards">
-          <div class="card co">
+          <article class="card co">
             <div class="band">目標企業</div>
-            <div class="medal"><Icon :name="sc.icon" :size="72" :stroke="1.5" /></div>
-            <div class="name">{{ sc.company }}</div>
-            <div class="chip">{{ sc.name }}・{{ sc.tagline }}</div>
+            <div class="identity">
+              <div class="medal"><Icon class="mark" :name="sc.icon" :size="36" :stroke="1.7" /></div>
+              <div class="identity-copy">
+                <div class="name">{{ sc.company }}</div>
+                <div class="chip">{{ sc.name }}・{{ sc.tagline }}</div>
+              </div>
+            </div>
             <p>{{ sc.story }}</p>
-          </div>
-          <div class="card mi">
+          </article>
+          <article class="card mi">
             <div class="band">你的任務</div>
-            <div class="medal"><Icon :name="m.icon" :size="72" :stroke="1.5" /></div>
-            <div class="name">{{ m.name }}</div>
+            <div class="identity">
+              <div class="medal"><Icon class="mark" :name="m.icon" :size="36" :stroke="1.7" /></div>
+              <div class="identity-copy">
+                <div class="name">{{ m.name }}</div>
+              </div>
+            </div>
             <p>{{ m.story }}</p>
-            <div class="goal"><b>目標</b>{{ m.goal }}</div>
-          </div>
+            <div class="goal"><b>目標</b><span>{{ m.goal }}</span></div>
+          </article>
         </div>
-        <button class="go" @click="confirmIntro">
+        <button class="go" type="button" @click="confirmIntro">
           <Icon name="play" :size="34" :stroke="2.6" />開始
         </button>
-      </div>
+      </main>
     </div>
   </Transition>
 </template>
@@ -49,160 +57,211 @@ const sc = computed(() => (game.s ? SCENARIOS[game.s.scenario] : null))
 .veil {
   position: absolute;
   inset: 0;
-  background: rgba(6, 9, 14, 0.9);
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(40, 52, 74, 0.46), transparent 68%),
+    rgba(6, 9, 14, 0.92);
 }
 .center {
   position: relative;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 40px;
+  width: min(calc(1100px / var(--stage-scale, 1)), calc(94vw / var(--stage-scale, 1)));
+  height: min(calc(560px / var(--stage-scale, 1)), calc(100dvh / var(--stage-scale, 1)));
+  max-height: 100%;
+  min-height: 0;
+  gap: calc(14px / var(--stage-scale, 1));
+  padding-block: max(
+    calc(12px / var(--stage-scale, 1)),
+    calc(env(safe-area-inset-top, 0px) / var(--stage-scale, 1))
+  ) max(
+    calc(12px / var(--stage-scale, 1)),
+    calc(env(safe-area-inset-bottom, 0px) / var(--stage-scale, 1))
+  );
 }
 .cards {
-  display: flex;
-  gap: 56px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  gap: calc(16px / var(--stage-scale, 1));
 }
 .card {
   --cc: #3c6aa8;
-  width: 520px;
-  min-height: 520px;
-  padding: 0 0 32px;
-  border-radius: 22px;
-  border: 8px solid var(--cc);
+  box-sizing: border-box;
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  text-align: center;
-  background: linear-gradient(180deg, #f8f1df, var(--paper2));
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 0 0 calc(16px / var(--stage-scale, 1));
+  border-radius: calc(18px / var(--stage-scale, 1));
+  border: calc(3px / var(--stage-scale, 1)) solid var(--cc);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(84, 77, 58, 0.45) transparent;
+  background: linear-gradient(165deg, #fbf5e8 0%, #f4ecd8 62%, var(--paper2) 100%);
   box-shadow:
-    0 0 0 3px var(--gold3),
-    0 24px 60px rgba(0, 0, 0, 0.7);
+    0 0 0 calc(2px / var(--stage-scale, 1)) var(--gold3),
+    0 calc(16px / var(--stage-scale, 1)) calc(38px / var(--stage-scale, 1)) rgba(0, 0, 0, 0.6);
   color: var(--ink);
-  overflow: hidden;
 }
 .card.mi {
   --cc: var(--c-finish);
 }
 .co {
-  animation: slide-in-left 0.6s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  animation: intro-card-left 380ms cubic-bezier(0.2, 0.8, 0.25, 1) backwards;
 }
 .mi {
-  /* 只在延遲時套用翻轉起始畫面；動畫結束後回到無 transform 的清晰靜態卡片。 */
-  animation: card-flip 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.1) 0.25s backwards;
+  animation: intro-card-right 420ms cubic-bezier(0.2, 0.8, 0.25, 1) 70ms backwards;
 }
 .band {
-  align-self: stretch;
-  padding: 8px 0;
-  font-size: 22px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-height: calc(36px / var(--stage-scale, 1));
+  padding: calc(6px / var(--stage-scale, 1)) calc(18px / var(--stage-scale, 1));
+  font-size: calc(14px / var(--stage-scale, 1));
   font-weight: 900;
-  letter-spacing: 10px;
-  text-indent: 10px;
+  letter-spacing: calc(2px / var(--stage-scale, 1));
   color: #fff;
   background: var(--cc);
+  box-shadow: inset 0 -1px rgba(255, 255, 255, 0.18);
+}
+.identity {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: calc(14px / var(--stage-scale, 1));
+  padding: calc(16px / var(--stage-scale, 1)) calc(22px / var(--stage-scale, 1)) 0;
 }
 .medal {
-  margin-top: 8px;
-  width: 128px;
-  height: 128px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: calc(72px / var(--stage-scale, 1));
+  height: calc(72px / var(--stage-scale, 1));
   display: grid;
   place-items: center;
   color: #fbf3dc;
   border-radius: 50%;
   background: #2c3d5c;
-  box-shadow:
-    0 0 0 6px var(--gold),
-    0 6px 12px rgba(0, 0, 0, 0.4);
+  border: calc(2px / var(--stage-scale, 1)) solid var(--gold);
+  box-shadow: 0 calc(4px / var(--stage-scale, 1)) calc(10px / var(--stage-scale, 1)) rgba(0, 0, 0, 0.32);
+}
+.medal :deep(.mark) {
+  width: calc(34px / var(--stage-scale, 1));
+  height: calc(34px / var(--stage-scale, 1));
+}
+.identity-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  gap: calc(7px / var(--stage-scale, 1));
 }
 .name {
-  margin-top: 6px;
-  font-size: 46px;
+  max-width: 100%;
+  font-size: calc(30px / var(--stage-scale, 1));
   font-weight: 900;
-  letter-spacing: 4px;
-  text-indent: 4px;
+  line-height: 1.2;
+  letter-spacing: calc(1px / var(--stage-scale, 1));
+  overflow-wrap: anywhere;
 }
 .chip {
-  padding: 3px 18px;
-  border-radius: 8px;
-  font-size: 21px;
-  font-weight: 900;
+  max-width: 100%;
+  padding: calc(4px / var(--stage-scale, 1)) calc(10px / var(--stage-scale, 1));
+  border-radius: 999px;
+  font-size: calc(14px / var(--stage-scale, 1));
+  font-weight: 800;
+  line-height: 1.4;
   color: #fff;
   background: var(--cc);
+  overflow-wrap: anywhere;
 }
 p {
-  margin: 4px 0 0;
-  padding: 0 34px;
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.7;
-  color: var(--ink);
-}
-.goal {
-  margin: auto 28px 0;
-  padding: 12px 18px;
-  border-radius: 12px;
-  font-size: 21px;
-  font-weight: 700;
-  line-height: 1.6;
+  flex: 0 0 auto;
+  margin: calc(14px / var(--stage-scale, 1)) calc(22px / var(--stage-scale, 1)) 0;
+  font-size: calc(20px / var(--stage-scale, 1));
+  font-weight: 650;
+  line-height: 1.58;
   text-align: left;
   color: var(--ink);
-  background: #fff3cf;
-  border: 3px solid var(--gold);
+}
+.co p {
+  margin-top: calc(14px / var(--stage-scale, 1));
+  margin-bottom: 0;
+}
+.goal {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: calc(9px / var(--stage-scale, 1));
+  margin: auto calc(18px / var(--stage-scale, 1)) 0;
+  padding: calc(12px / var(--stage-scale, 1)) calc(14px / var(--stage-scale, 1));
+  border-radius: calc(12px / var(--stage-scale, 1));
+  font-size: calc(19px / var(--stage-scale, 1));
+  font-weight: 700;
+  line-height: 1.55;
+  color: var(--ink);
+  background: linear-gradient(135deg, #fff7e1, #f9edca);
+  border: calc(2px / var(--stage-scale, 1)) solid var(--gold);
+  box-shadow: inset calc(4px / var(--stage-scale, 1)) 0 0 rgba(143, 106, 38, 0.18);
 }
 .goal b {
-  margin-right: 10px;
-  padding: 1px 10px;
-  border-radius: 6px;
-  font-size: 18px;
-  letter-spacing: 3px;
+  padding: calc(3px / var(--stage-scale, 1)) calc(8px / var(--stage-scale, 1));
+  border-radius: calc(6px / var(--stage-scale, 1));
+  font-size: calc(12px / var(--stage-scale, 1));
+  font-weight: 900;
+  letter-spacing: calc(1px / var(--stage-scale, 1));
   color: #fff;
   background: #8a5a1c;
 }
 .go {
+  box-sizing: border-box;
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 14px;
-  height: 100px;
-  padding: 0 90px;
-  border-radius: 18px;
-  font-size: 48px;
+  justify-content: center;
+  gap: calc(10px / var(--stage-scale, 1));
+  min-width: calc(176px / var(--stage-scale, 1));
+  min-height: calc(60px / var(--stage-scale, 1));
+  padding: 0 calc(32px / var(--stage-scale, 1));
+  border-radius: calc(14px / var(--stage-scale, 1));
+  font-size: calc(26px / var(--stage-scale, 1));
   font-weight: 900;
-  letter-spacing: 14px;
-  text-indent: 14px;
+  letter-spacing: calc(3px / var(--stage-scale, 1));
+  text-indent: calc(3px / var(--stage-scale, 1));
   color: #2a1e08;
   background: linear-gradient(180deg, var(--gold2), var(--gold));
-  border: 4px solid var(--gold3);
+  border: calc(2px / var(--stage-scale, 1)) solid var(--gold3);
   box-shadow:
-    0 8px 0 #6d4f17,
-    0 16px 26px rgba(0, 0, 0, 0.5);
-  transition:
-    transform 0.1s,
-    box-shadow 0.1s,
-    filter 0.15s;
-  animation: pop 0.5s cubic-bezier(0.2, 1.2, 0.3, 1) 0.9s both;
+    0 calc(4px / var(--stage-scale, 1)) 0 #6d4f17,
+    0 calc(9px / var(--stage-scale, 1)) calc(18px / var(--stage-scale, 1)) rgba(0, 0, 0, 0.42);
+  transition: transform 140ms ease, box-shadow 140ms ease, filter 160ms ease;
+  animation: intro-button-in 340ms cubic-bezier(0.2, 0.9, 0.3, 1) 140ms backwards;
 }
 .go:hover {
   filter: brightness(1.08);
 }
+.go:focus-visible {
+  outline: calc(3px / var(--stage-scale, 1)) solid #fff8df;
+  outline-offset: calc(4px / var(--stage-scale, 1));
+}
 .go:active {
-  transform: translateY(6px);
+  transform: translateY(calc(3px / var(--stage-scale, 1)));
   box-shadow:
-    0 2px 0 #6d4f17,
-    0 6px 12px rgba(0, 0, 0, 0.5);
+    0 calc(1px / var(--stage-scale, 1)) 0 #6d4f17,
+    0 calc(3px / var(--stage-scale, 1)) calc(8px / var(--stage-scale, 1)) rgba(0, 0, 0, 0.4);
 }
-@keyframes card-flip {
+@keyframes intro-card-left {
   from {
-    transform: perspective(1200px) rotateY(95deg) scale(0.7);
-    opacity: 0;
-  }
-  to {
-    transform: perspective(1200px) rotateY(0) scale(1);
-    opacity: 1;
-  }
-}
-@keyframes slide-in-left {
-  from {
-    transform: translateX(-80px);
+    transform: translateX(calc(-24px / var(--stage-scale, 1)));
     opacity: 0;
   }
   to {
@@ -210,9 +269,19 @@ p {
     opacity: 1;
   }
 }
-@keyframes pop {
+@keyframes intro-card-right {
   from {
-    transform: scale(0.7);
+    transform: translateY(calc(12px / var(--stage-scale, 1)));
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes intro-button-in {
+  from {
+    transform: translateY(calc(8px / var(--stage-scale, 1)));
     opacity: 0;
   }
   to {
@@ -221,10 +290,84 @@ p {
   }
 }
 .fade-leave-active {
-  transition: opacity 0.4s;
+  transition: opacity 240ms ease;
 }
 .fade-leave-to {
   opacity: 0;
+}
+@media (orientation: landscape) and (max-height: 430px) {
+  .center {
+    width: min(2040px, calc(94vw / var(--stage-scale, 1)));
+    gap: calc(9px / var(--stage-scale, 1));
+    padding-block: max(
+      calc(6px / var(--stage-scale, 1)),
+      calc(env(safe-area-inset-top, 0px) / var(--stage-scale, 1))
+    ) max(
+      calc(6px / var(--stage-scale, 1)),
+      calc(env(safe-area-inset-bottom, 0px) / var(--stage-scale, 1))
+    );
+  }
+  .cards {
+    gap: calc(10px / var(--stage-scale, 1));
+  }
+  .card {
+    padding-bottom: calc(10px / var(--stage-scale, 1));
+  }
+  .band {
+    min-height: calc(30px / var(--stage-scale, 1));
+    padding-inline: calc(14px / var(--stage-scale, 1));
+    font-size: calc(13px / var(--stage-scale, 1));
+  }
+  .identity {
+    gap: calc(10px / var(--stage-scale, 1));
+    padding: calc(8px / var(--stage-scale, 1)) calc(14px / var(--stage-scale, 1)) 0;
+  }
+  .medal {
+    width: calc(54px / var(--stage-scale, 1));
+    height: calc(54px / var(--stage-scale, 1));
+  }
+  .medal :deep(.mark) {
+    width: calc(28px / var(--stage-scale, 1));
+    height: calc(28px / var(--stage-scale, 1));
+  }
+  .identity-copy {
+    gap: calc(5px / var(--stage-scale, 1));
+  }
+  .name {
+    font-size: calc(20px / var(--stage-scale, 1));
+  }
+  .chip {
+    padding-block: calc(3px / var(--stage-scale, 1));
+    font-size: calc(11px / var(--stage-scale, 1));
+  }
+  p {
+    margin: calc(9px / var(--stage-scale, 1)) calc(14px / var(--stage-scale, 1)) 0;
+    font-size: calc(15px / var(--stage-scale, 1));
+    line-height: 1.5;
+  }
+  .co p {
+    margin-block: auto;
+  }
+  .goal {
+    gap: calc(7px / var(--stage-scale, 1));
+    margin-inline: calc(12px / var(--stage-scale, 1));
+    padding: calc(8px / var(--stage-scale, 1)) calc(10px / var(--stage-scale, 1));
+    font-size: calc(14px / var(--stage-scale, 1));
+    line-height: 1.45;
+  }
+  .goal b {
+    font-size: calc(11px / var(--stage-scale, 1));
+  }
+  .go {
+    min-width: calc(156px / var(--stage-scale, 1));
+    min-height: calc(54px / var(--stage-scale, 1));
+    padding-inline: calc(24px / var(--stage-scale, 1));
+    font-size: calc(23px / var(--stage-scale, 1));
+  }
+  .go :deep(svg) {
+    width: calc(22px / var(--stage-scale, 1));
+    height: calc(22px / var(--stage-scale, 1));
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .co,
@@ -233,6 +376,10 @@ p {
     animation: none;
     opacity: 1;
     transform: none;
+  }
+  .go,
+  .fade-leave-active {
+    transition: none;
   }
 }
 </style>

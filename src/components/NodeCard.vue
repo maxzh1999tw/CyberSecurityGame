@@ -210,6 +210,7 @@ function leave() {
           <span
             v-if="s.state === 'vuln' || s.state === 'struck'"
             class="mark pub"
+            :class="{ countdown: s.eta }"
           >
             <Icon name="eye" :size="15" :stroke="2.6" />
             <template v-if="s.eta">
@@ -1152,5 +1153,33 @@ function leave() {
 }
 .node.drag-over {
   outline-width: 5px;
+}
+
+/* 小螢幕先保留可用來出牌的弱點名稱，重複的狀態圖示才讓出空間。 */
+@media (pointer: coarse) and (max-width: 1000px) {
+  .slot {
+    gap: 5px;
+    padding-inline: 10px 6px;
+    font-size: clamp(17px, calc(10px / var(--stage-scale, 1)), 29px);
+    line-height: 1.1;
+  }
+  .slot .sic,
+  .mark.pub > :first-child,
+  .mark.pub:not(.countdown) {
+    display: none;
+  }
+  .mark {
+    min-width: 0;
+    padding-inline: 4px;
+  }
+  .mark b {
+    padding: 0;
+    font-size: clamp(19px, calc(9px / var(--stage-scale, 1)), 26px);
+  }
+  .slot.st-shield,
+  .slot.st-fixed,
+  .slot.st-wall {
+    font-size: clamp(16.5px, calc(9px / var(--stage-scale, 1)), 26px);
+  }
 }
 </style>

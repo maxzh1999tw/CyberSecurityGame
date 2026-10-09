@@ -442,37 +442,36 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (pointer: coarse) {
+@media (pointer: coarse) and (max-width: 1000px) {
   .game .rail.left .mission {
     padding-bottom: 7px;
   }
   .game .rail.left .mission .tag,
-  .game .rail.left .mission .title,
-  .game .rail.left .mission .lbl,
   .game .rail.left .track .tag,
   .game .rail.left .track .lbl {
     display: none !important;
   }
   .game .rail.left .mission .head {
-    justify-content: center;
+    gap: 10px;
     padding: 8px 6px 6px;
+  }
+  .game .rail.left .mission .title {
+    font-size: clamp(27px, calc(11px / var(--stage-scale, 1)), 32px);
   }
   .game .rail.left .mission .badge {
     width: 42px;
     height: 42px;
   }
   .game .rail.left .mission .goals {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    justify-items: center;
+    grid-template-columns: minmax(0, 1fr);
     padding: 0 5px;
     gap: 4px;
   }
   .game .rail.left .mission .goals li {
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    justify-content: center;
-    border-radius: 50%;
+    height: 40px;
+    padding: 0 6px;
+    gap: 6px;
+    font-size: clamp(19px, calc(9px / var(--stage-scale, 1)), 26px);
   }
   .game .rail.left .mission .chk {
     width: 28px;
@@ -499,7 +498,7 @@ onBeforeUnmount(() => {
   .game .rail.left .mine .tag {
     height: 28px;
     padding: 3px 0;
-    font-size: 0;
+    font-size: clamp(16px, calc(8px / var(--stage-scale, 1)), 24px);
     letter-spacing: 0;
     text-indent: 0;
   }
@@ -515,9 +514,12 @@ onBeforeUnmount(() => {
     gap: 4px;
     padding: 4px;
   }
-  .game .rail.left .mine .tx,
+  .game .rail.left .mine .tx span,
   .game .rail.left .mine .empty {
     display: none;
+  }
+  .game .rail.left .mine .tx b {
+    font-size: clamp(16px, calc(9px / var(--stage-scale, 1)), 26px);
   }
   .game .rail.left .mine .av {
     width: 32px;
@@ -535,16 +537,22 @@ onBeforeUnmount(() => {
   .game .rail.right .company .who,
   .game .rail.right .company .react,
   .game .rail.right .company .it {
-    justify-content: center;
-    gap: 0;
+    gap: 6px;
     padding: 6px;
   }
-  .game .rail.right .company .names,
-  .game .rail.right .company .rt,
   .game .rail.right .company .board .title,
   .game .rail.right .company .lb,
   .game .rail.right .company .empty {
     display: none;
+  }
+  .game .rail.right .company .names b,
+  .game .rail.right .company .rt b {
+    font-size: clamp(19px, calc(9px / var(--stage-scale, 1)), 26px);
+    white-space: normal;
+  }
+  .game .rail.right .company .names span,
+  .game .rail.right .company .rt span {
+    font-size: clamp(15px, calc(8px / var(--stage-scale, 1)), 23px);
   }
   .game .rail.right .company .logo {
     width: 38px;
@@ -582,9 +590,6 @@ onBeforeUnmount(() => {
   .game .node .kind {
     gap: 0;
     font-size: 0;
-  }
-  .game .node .sname {
-    display: none;
   }
 }
 </style>

@@ -195,46 +195,6 @@ svg {
     padding-top: max(16px, calc(env(safe-area-inset-top, 0px) / var(--stage-scale)));
   }
 
-  .csg-stage .intro .center {
-    width: min(1800px, calc(92vw / var(--stage-scale)));
-    height: calc(100dvh / var(--stage-scale));
-    max-height: 100%;
-    min-height: 0;
-    gap: 18px;
-    padding: max(12px, calc(env(safe-area-inset-top, 0px) / var(--stage-scale))) 0
-      max(12px, calc(env(safe-area-inset-bottom, 0px) / var(--stage-scale)));
-  }
-  .csg-stage .intro .cards {
-    flex: 1 1 auto;
-    width: 100%;
-    min-height: 0;
-    gap: 24px;
-    overflow: hidden;
-  }
-  .csg-stage .intro .card {
-    flex: 1 1 0;
-    width: auto;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-  .csg-stage .intro .card > * {
-    flex-shrink: 0;
-  }
-  .csg-stage .intro .card p,
-  .csg-stage .intro .card .goal {
-    font-size: calc(13px / var(--stage-scale));
-    line-height: 1.55;
-  }
-  .csg-stage .intro .card .chip {
-    font-size: calc(11px / var(--stage-scale));
-  }
-  .csg-stage .intro .go {
-    flex: 0 0 auto;
-    min-height: 120px;
-  }
   .csg-stage .help .panel {
     width: min(1680px, calc(92vw / var(--stage-scale)));
     min-height: 0;
@@ -276,9 +236,7 @@ svg {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hc,
-  .card-preview-shell,
-  .card-preview-scrim {
+  .hc {
     scroll-behavior: auto;
   }
   .hc {

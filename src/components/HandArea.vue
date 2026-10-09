@@ -15,6 +15,7 @@ const hand = computed<CardInst[]>(() => game.s?.hand ?? [])
 
 const REST_SCALE = 0.8
 const HOVER_SCALE = 1.22
+const PREVIEW_SCALE_MAX = 2.55
 const HOLD_TO_PREVIEW_MS = 440
 const TOUCH_DRAG_THRESHOLD = 12
 
@@ -28,6 +29,13 @@ interface Slot {
 const dragUid = computed(() => ui.drag?.uid ?? null)
 const playingUid = computed(() => ui.playing?.uid ?? null)
 const previewUid = ref<number | null>(null)
+const handoffUid = ref<number | null>(null)
+const previewScale = computed(() => {
+  const scale = Math.max(view.scale, 0.001)
+  const safeW = view.w - 36 / scale
+  const safeH = view.h - 36 / scale
+  return Math.max(1, Math.min(PREVIEW_SCALE_MAX, safeW / 280, safeH / 380))
+})
 
 interface TouchGesture {
   uid: number
@@ -40,12 +48,22 @@ interface TouchGesture {
 
 let touchGesture: TouchGesture | null = null
 let holdTimer = 0
+let handoffTimer = 0
 const activeTouchPointers = new Set<number>()
 let blockUntilTouchesEnd = false
 
 function clearHoldTimer() {
   if (holdTimer) window.clearTimeout(holdTimer)
   holdTimer = 0
+}
+
+function startDragHandoff(uid: number) {
+  window.clearTimeout(handoffTimer)
+  handoffUid.value = uid
+  handoffTimer = window.setTimeout(() => {
+    if (handoffUid.value === uid) handoffUid.value = null
+    handoffTimer = 0
+  }, 130)
 }
 
 function clearTouchGesture(cancelDrag = false) {
@@ -76,13 +94,16 @@ function onTouchMove(ev: PointerEvent) {
   const active = touchGesture
   if (!active || ev.pointerId !== active.pointerId) return
   const distance = Math.hypot(ev.clientX - active.startX, ev.clientY - active.startY)
-  if (distance < TOUCH_DRAG_THRESHOLD) return
+  // store 的拖曳門檻以舞台座標計算；換算後仍要確保手指移動已超過 8 個舞台像素。
+  if (distance < Math.max(TOUCH_DRAG_THRESHOLD, 9 * view.scale)) return
 
   clearHoldTimer()
   if (active.phase !== 'drag') {
+    const wasPreview = active.phase === 'preview'
     previewUid.value = null
     if (ui.hoverCard === active.uid) ui.hoverCard = null
     active.phase = 'drag'
+    if (wasPreview) startDragHandoff(active.uid)
     pointerDownCard(active.uid, active.startEvent, ev)
   }
 }
@@ -188,6 +209,7 @@ const slots = computed<Slot[]>(() => {
     const isFresh = ui.freshCards.includes(c.uid)
     const isPlaying = ui.playing?.uid === c.uid
     const isRecycling = ui.recycling === c.uid
+    const isPreview = previewUid.value === c.uid
 
     if (isFresh && deck) {
       // 從牌堆飛進來
@@ -217,7 +239,9 @@ const slots = computed<Slot[]>(() => {
     } else if (isDrag) {
       const d = ui.drag!
       z = 400
-      tr = 'none'
+      tr = handoffUid.value === c.uid
+        ? 'transform 130ms cubic-bezier(.2,.72,.3,1), opacity 130ms ease-out'
+        : 'none'
       rot = 0
       if (d.mode === 'node') {
         // 要選目標的牌：停在場中，用箭頭指向目標
@@ -231,6 +255,14 @@ const slots = computed<Slot[]>(() => {
         y = d.y - O.y + 170 * scale
       }
       cls.dragging = true
+    } else if (isPreview) {
+      scale = previewScale.value
+      x = view.w / 2 - boardCenter()
+      y = view.h / 2 - view.h + 170 * scale
+      rot = 0
+      z = 800
+      tr = 'transform 260ms cubic-bezier(.18,1.16,.32,1), opacity 180ms ease-out'
+      cls.preview = true
     } else if (ui.hoverCard === c.uid && !ui.drag && !ui.busy) {
       x = Math.max(-420, Math.min(420, x))
       y = -10
@@ -274,8 +306,6 @@ const nolog = computed(() => {
   return st ? knownHas(node(st, 'infra'), 'nolog') === 'Y' : false
 })
 
-const previewSlot = computed(() => slots.value.find((sl) => sl.c.uid === previewUid.value) ?? null)
-
 onMounted(() => {
   window.addEventListener('pointerdown', onGlobalTouchDown, true)
   window.addEventListener('pointerup', onGlobalTouchEnd, true)
@@ -290,6 +320,8 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   clearTouchGesture(true)
+  window.clearTimeout(handoffTimer)
+  handoffUid.value = null
   window.removeEventListener('pointerdown', onGlobalTouchDown, true)
   window.removeEventListener('pointerup', onGlobalTouchEnd, true)
   window.removeEventListener('pointercancel', onGlobalTouchEnd, true)
@@ -328,26 +360,6 @@ onBeforeUnmount(() => {
       <CardTip v-if="ui.hoverCard === sl.c.uid && !ui.drag && !previewUid" />
     </div>
   </div>
-  <Teleport to="body">
-    <Transition name="card-preview">
-      <div v-if="previewSlot" class="card-preview-scrim" aria-live="polite" aria-label="卡牌詳細資料">
-        <div class="card-preview-shell">
-          <div class="preview-card-frame">
-            <CardFace
-              :id="previewSlot.c.id"
-              :cost="previewSlot.pb.cost"
-              :free="previewSlot.pb.free"
-              :unaffordable="!previewSlot.pb.affordable"
-              :dead="previewSlot.pb.status === 'dead'"
-              :noise="nolog ? Math.ceil(CARDS[previewSlot.c.id].noise / 2) : undefined"
-              :noise-halved="nolog"
-            />
-          </div>
-          <CardTip preview />
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
 </template>
 
 <style scoped>
@@ -370,6 +382,10 @@ onBeforeUnmount(() => {
 }
 .hc.dragging {
   cursor: grabbing;
+}
+.hc.preview {
+  cursor: default;
+  will-change: auto;
 }
 .aura {
   position: absolute;
@@ -394,6 +410,9 @@ onBeforeUnmount(() => {
 .hc.nope {
   filter: saturate(0.7) brightness(0.88);
 }
+.hc.preview {
+  filter: none;
+}
 
 @media (pointer: coarse) and (orientation: landscape) and (max-width: 1000px) {
   .hc {
@@ -402,81 +421,4 @@ onBeforeUnmount(() => {
   }
 }
 
-.card-preview-scrim {
-  position: fixed;
-  z-index: 10001;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
-  background: rgba(4, 7, 13, 0.68);
-  backdrop-filter: blur(3px);
-  pointer-events: none;
-}
-.card-preview-shell {
-  position: relative;
-  width: min(900px, calc(100vw - 24px));
-  max-height: calc(100dvh - 20px);
-  padding: 16px 20px;
-  border-radius: 18px;
-  display: grid;
-  grid-template-columns: 202px minmax(260px, 1fr);
-  align-items: center;
-  gap: 18px;
-  border: 2px solid var(--gold3);
-  background: linear-gradient(155deg, rgba(37, 48, 67, 0.98), rgba(14, 19, 28, 0.98));
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.74), inset 0 0 0 1px rgba(242, 217, 148, 0.16);
-}
-.preview-card-frame {
-  position: relative;
-  width: 202px;
-  height: 286px;
-}
-.preview-card-frame :deep(.card) {
-  transform: scale(0.84);
-  transform-origin: left top;
-}
-.card-preview-enter-active {
-  transition: opacity 180ms ease-out;
-}
-.card-preview-leave-active {
-  pointer-events: none;
-  transition: opacity 90ms ease-in;
-}
-.card-preview-enter-active .card-preview-shell,
-.card-preview-leave-active .card-preview-shell {
-  transition: transform 230ms cubic-bezier(0.18, 1.2, 0.35, 1);
-}
-.card-preview-enter-from,
-.card-preview-leave-to {
-  opacity: 0;
-}
-.card-preview-enter-from .card-preview-shell,
-.card-preview-leave-to .card-preview-shell {
-  transform: translateY(16px) scale(0.84);
-}
-@media (max-width: 700px) and (orientation: landscape) {
-  .card-preview-shell {
-    width: calc(100vw - 20px);
-    grid-template-columns: 172px minmax(0, 1fr);
-    gap: 12px;
-    padding: 12px 14px;
-    border-radius: 14px;
-  }
-  .preview-card-frame {
-    width: 172px;
-    height: 243px;
-  }
-  .preview-card-frame :deep(.card) {
-    transform: scale(0.716);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .card-preview-enter-active,
-  .card-preview-leave-active,
-  .card-preview-enter-active .card-preview-shell,
-  .card-preview-leave-active .card-preview-shell {
-    transition-duration: 1ms;
-  }
-}
 </style>
