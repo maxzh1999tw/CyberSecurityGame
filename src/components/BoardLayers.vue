@@ -60,23 +60,23 @@ const gateText = (layer: number) => {
 
   if (layer === 1) {
     if (s.nodes.some((n) => n.layer === 0 && n.controlled)) message = '已控制外圍 → 開啟一般內網攻擊'
-    const infra = s.nodes.find((n) => n.role === 'infra')
-    if (!message && infra?.controlled) message = '基礎設施已控制；其他內網目標仍要有可達路徑'
-    if (!message && infra && !infra.controlled && hasKnownWeakness(infra, 'remote')) message = '「遠端大門」 → 可直攻基礎設施'
-    if (!message) message = '控制任一外圍節點 → 開啟一般內網攻擊；「遠端大門」 可直攻基礎設施'
+    const infras = s.nodes.filter((n) => n.role === 'infra' && n.layer === 1)
+    const held = infras.filter((n) => n.controlled)
+    const remote = infras.filter((n) => !n.controlled && hasKnownWeakness(n, 'remote'))
+    if (!message && held.length) message = `${held.map((n) => n.name).join('、')}已控制；其他內網目標仍要有可達路徑`
+    if (!message && remote.length) message = `「遠端大門」 → 可直攻${remote.map((n) => n.name).join('、')}`
+    if (!message) message = '控制任一外圍節點 → 開啟一般內網攻擊；「遠端大門」 可直攻所在的基礎設施'
   }
   else if (layer === 2) {
     if (s.nodes.some((n) => n.layer === 1 && n.controlled)) message = '已控制內網 → 可攻擊核心'
     const db = s.nodes.find((n) => n.role === 'db')
     const backup = s.nodes.find((n) => n.role === 'backup')
-    const infra = s.nodes.find((n) => n.role === 'infra')
-    const ai = s.nodes.find((n) => n.role === 'ai')
     const outerControlled = s.nodes.some((n) => n.layer === 0 && n.controlled)
     const employeeControlled = s.nodes.some((n) => n.kind === 'employee' && n.controlled)
-    const aiControlled = !!ai?.controlled
-    const openSea = outerControlled && hasKnownWeakness(infra, 'openSea')
+    // 任一基礎設施有自由海域、任一受控 AI 有萬能鑰匙都算
+    const openSea = outerControlled && s.nodes.some((n) => n.role === 'infra' && hasKnownWeakness(n, 'openSea'))
     const allAccess = employeeControlled && hasKnownWeakness(db, 'allaccess')
-    const masterKey = aiControlled && hasKnownWeakness(ai, 'masterkey')
+    const masterKey = s.nodes.some((n) => n.kind === 'ai' && n.controlled && hasKnownWeakness(n, 'masterkey'))
     if (!message && (openSea || allAccess || masterKey)) {
       const paths: string[] = []
       if (openSea) paths.push('外圍＋「自由海域」 → 資料庫與備份')
@@ -117,7 +117,7 @@ const gateText = (layer: number) => {
           <Icon :name="r.icon" :size="26" :stroke="2" />
           <span>{{ r.name }}</span>
         </div>
-        <div class="nodes">
+        <div class="nodes" :class="{ sparse: r.nodes.length <= 2, crowded: r.nodes.length >= 5 }">
           <NodeCard v-for="n in r.nodes" :key="n.id" :node="n" />
         </div>
       </div>
@@ -181,8 +181,20 @@ const gateText = (layer: number) => {
   padding: 0 24px 0 8px;
   pointer-events: auto;
 }
-.layer-2 .nodes {
+/* 節點少的層（例如核心只有資料庫與備份）拉開間距 */
+.nodes.sparse {
   gap: 80px;
+}
+/* 一層五個節點時：縮小間距與名稱字級，讓四個字的名稱放得下 */
+.nodes.crowded {
+  gap: 16px;
+}
+.nodes.crowded :deep(.head) {
+  gap: 9px;
+  padding-inline: 10px;
+}
+.nodes.crowded :deep(.name) {
+  font-size: 19px;
 }
 
 .fw {

@@ -5,10 +5,16 @@ export type Tri = 'Y' | 'N' | 'M'
 
 export type Layer = 0 | 1 | 2 // 0 外圍、1 內網、2 核心
 export type NodeKind = 'employee' | 'infra' | 'ai' | 'data'
+/**
+ * 節點角色決定規則與插圖；名稱由各公司的配置決定。
+ * sales＝一般職員、engineer＝技術人員、boss＝主管、chairman＝董事長（也算主管級）。
+ * 基礎設施與 AI 可能不只一個；IT、資料庫、備份每間公司各一個。
+ */
 export type NodeRole =
   | 'sales'
   | 'engineer'
   | 'boss'
+  | 'chairman'
   | 'ai'
   | 'it'
   | 'infra'
@@ -150,6 +156,21 @@ export interface ScenarioDef {
   vulnCopies: Partial<Record<VulnId, number>>
   /** 「已防護」牌在牌堆裡的張數（沒寫就是 1） */
   shieldCopies: Partial<Record<VulnId, number>>
+  /** 這間公司的節點配置 */
+  layout: NodeTemplate[]
+}
+
+/** 開局節點配置 */
+export interface NodeTemplate {
+  id: string
+  name: string
+  role: NodeRole
+  kind: NodeKind
+  layer: Layer
+  /** 底下蓋幾張牌 */
+  draw: number
+  /** 頭像（沒寫就用角色預設的插圖） */
+  art?: string
 }
 
 /** 節點上的一個牌位（蓋著的牌） */
@@ -176,6 +197,8 @@ export interface GameNode {
   role: NodeRole
   kind: NodeKind
   layer: Layer
+  /** 頭像（沒寫就用角色預設的插圖） */
+  art?: string
   slots: Slot[]
   controlled: boolean
   /** 被控制的先後順序（越大越新） */

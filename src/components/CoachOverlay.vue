@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 第一次遊玩時的 4 步導覽：直接指著畫面上的東西
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { anchorRect, boardCenter, nodeRect, ui, view } from '../game/store'
+import { anchorRect, boardCenter, game, nodeRect, ui, view } from '../game/store'
 import type { Rect } from '../game/store'
 import Icon from './Icon.vue'
 
@@ -14,7 +14,11 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    target: () => nodeRect('sales'),
+    // 每間公司的節點不同：指著外圍的第一個節點
+    target: () => {
+      const first = game.s?.nodes.find((n) => n.layer === 0)
+      return first ? nodeRect(first.id) : null
+    },
     text: '每個節點底下都蓋著牌，其中有些是可以利用的弱點。先偵查，再下手。',
     side: 'above',
   },

@@ -2,7 +2,7 @@
 // 滑過手牌時，在牌旁邊顯示的小知識與狀態
 import { computed } from 'vue'
 import { CARDS } from '../game/data'
-import { knownHas, node, playability } from '../game/engine'
+import { knownHas, noLogs, playability } from '../game/engine'
 import { deadReason, game, ui } from '../game/store'
 
 const info = computed(() => {
@@ -13,7 +13,7 @@ const info = computed(() => {
   const def = CARDS[inst.id]
   const pb = playability(s, inst.id)
   return {
-    noise: knownHas(node(s, 'infra'), 'nolog') === 'Y' ? Math.ceil(def.noise / 2) : def.noise,
+    noise: noLogs(s, knownHas) === 'Y' ? Math.ceil(def.noise / 2) : def.noise,
     trivia: def.trivia,
     dead: pb.status === 'dead' ? deadReason(s, inst.id) : null,
     unaff: pb.status !== 'dead' && !pb.affordable,

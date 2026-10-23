@@ -1,12 +1,15 @@
 <script setup lang="ts">
 // 開場劇本：這是哪間公司、這次要做什麼。看完按「開始」才進遊戲。
+// 公司與任務一開始是隨機抽的，可以用上下箭頭各自換成別的。
 import { computed } from 'vue'
-import { MISSIONS, SCENARIOS } from '../game/data'
-import { confirmIntro, game, ui } from '../game/store'
+import { MISSIONS, MISSION_IDS, SCENARIOS, SCENARIO_IDS } from '../game/data'
+import { confirmIntro, cycleIntro, game, ui } from '../game/store'
 import Icon from './Icon.vue'
 
 const m = computed(() => (game.s ? MISSIONS[game.s.mission] : null))
 const sc = computed(() => (game.s ? SCENARIOS[game.s.scenario] : null))
+const scIndex = computed(() => (game.s ? SCENARIO_IDS.indexOf(game.s.scenario) + 1 : 0))
+const mIndex = computed(() => (game.s ? MISSION_IDS.indexOf(game.s.mission) + 1 : 0))
 </script>
 
 <template>
@@ -18,24 +21,34 @@ const sc = computed(() => (game.s ? SCENARIOS[game.s.scenario] : null))
           <article class="card co">
             <div class="band">目標企業</div>
             <div class="identity">
-              <div class="medal"><Icon class="mark" :name="sc.icon" :size="36" :stroke="1.7" /></div>
-              <div class="identity-copy">
+              <div :key="sc.id" class="medal swap"><Icon class="mark" :name="sc.icon" :size="36" :stroke="1.7" /></div>
+              <div :key="sc.id" class="identity-copy swap">
                 <div class="name">{{ sc.company }}</div>
                 <div class="chip">{{ sc.name }}・{{ sc.tagline }}</div>
               </div>
+              <div class="pick" role="group" aria-label="換目標企業">
+                <button type="button" aria-label="上一間企業" @click="cycleIntro('scenario', -1)"><Icon name="chevron-up" :size="26" :stroke="2.8" /></button>
+                <span>{{ scIndex }}/{{ SCENARIO_IDS.length }}</span>
+                <button type="button" aria-label="下一間企業" @click="cycleIntro('scenario', 1)"><Icon name="chevron-down" :size="26" :stroke="2.8" /></button>
+              </div>
             </div>
-            <p>{{ sc.story }}</p>
+            <p :key="sc.id" class="swap">{{ sc.story }}</p>
           </article>
           <article class="card mi">
             <div class="band">你的任務</div>
             <div class="identity">
-              <div class="medal"><Icon class="mark" :name="m.icon" :size="36" :stroke="1.7" /></div>
-              <div class="identity-copy">
+              <div :key="m.id" class="medal swap"><Icon class="mark" :name="m.icon" :size="36" :stroke="1.7" /></div>
+              <div :key="m.id" class="identity-copy swap">
                 <div class="name">{{ m.name }}</div>
               </div>
+              <div class="pick" role="group" aria-label="換任務">
+                <button type="button" aria-label="上一個任務" @click="cycleIntro('mission', -1)"><Icon name="chevron-up" :size="26" :stroke="2.8" /></button>
+                <span>{{ mIndex }}/{{ MISSION_IDS.length }}</span>
+                <button type="button" aria-label="下一個任務" @click="cycleIntro('mission', 1)"><Icon name="chevron-down" :size="26" :stroke="2.8" /></button>
+              </div>
             </div>
-            <p>{{ m.story }}</p>
-            <div class="goal"><b>目標</b><span>{{ m.goal }}</span></div>
+            <p :key="m.id" class="swap">{{ m.story }}</p>
+            <div :key="m.id" class="goal swap"><b>目標</b><span>{{ m.goal }}</span></div>
           </article>
         </div>
         <button class="go" type="button" @click="confirmIntro">
@@ -172,6 +185,56 @@ const sc = computed(() => (game.s ? SCENARIOS[game.s.scenario] : null))
   line-height: 1.2;
   letter-spacing: calc(1px / var(--stage-scale, 1));
   overflow-wrap: anywhere;
+}
+.pick {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: auto;
+  gap: calc(2px / var(--stage-scale, 1));
+}
+.pick button {
+  box-sizing: border-box;
+  width: calc(44px / var(--stage-scale, 1));
+  height: calc(34px / var(--stage-scale, 1));
+  display: grid;
+  place-items: center;
+  border-radius: calc(9px / var(--stage-scale, 1));
+  color: #fff;
+  background: var(--cc);
+  border: calc(2px / var(--stage-scale, 1)) solid color-mix(in srgb, var(--cc) 60%, #000);
+  box-shadow: 0 calc(2px / var(--stage-scale, 1)) 0 color-mix(in srgb, var(--cc) 45%, #000);
+  transition: transform 120ms ease, filter 140ms ease;
+}
+.pick button :deep(svg) {
+  width: calc(24px / var(--stage-scale, 1));
+  height: calc(24px / var(--stage-scale, 1));
+}
+.pick button:hover {
+  filter: brightness(1.12);
+}
+.pick button:active {
+  transform: translateY(calc(2px / var(--stage-scale, 1)));
+}
+.pick button:focus-visible {
+  outline: calc(3px / var(--stage-scale, 1)) solid var(--gold);
+  outline-offset: calc(2px / var(--stage-scale, 1));
+}
+.pick span {
+  font-size: calc(13px / var(--stage-scale, 1));
+  font-weight: 900;
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--cc) 80%, var(--ink));
+}
+.swap {
+  animation: intro-swap 240ms ease backwards;
+}
+@keyframes intro-swap {
+  from {
+    opacity: 0;
+    transform: translateY(calc(6px / var(--stage-scale, 1)));
+  }
 }
 .chip {
   max-width: 100%;
@@ -340,6 +403,17 @@ p {
     padding-block: calc(3px / var(--stage-scale, 1));
     font-size: calc(11px / var(--stage-scale, 1));
   }
+  .pick button {
+    width: calc(40px / var(--stage-scale, 1));
+    height: calc(26px / var(--stage-scale, 1));
+  }
+  .pick button :deep(svg) {
+    width: calc(20px / var(--stage-scale, 1));
+    height: calc(20px / var(--stage-scale, 1));
+  }
+  .pick span {
+    font-size: calc(11px / var(--stage-scale, 1));
+  }
   p {
     margin: calc(9px / var(--stage-scale, 1)) calc(14px / var(--stage-scale, 1)) 0;
     font-size: calc(15px / var(--stage-scale, 1));
@@ -372,7 +446,8 @@ p {
 @media (prefers-reduced-motion: reduce) {
   .co,
   .mi,
-  .go {
+  .go,
+  .swap {
     animation: none;
     opacity: 1;
     transform: none;

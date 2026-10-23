@@ -1,7 +1,7 @@
 // 遊戲畫面的狀態與操作：把規則引擎和動畫串在一起
 import { reactive } from 'vue'
 import { sfx } from '../audio/sfx'
-import { BACKUP_RESTORE_TURNS, CARDS, INFRA_PARALYZE_TURNS, IT_PARALYZE_TURNS, recaptureTurnsOf, SCENARIO_IDS, VULNS } from './data'
+import { BACKUP_RESTORE_TURNS, CARDS, INFRA_PARALYZE_TURNS, IT_PARALYZE_TURNS, MISSION_IDS, recaptureTurnsOf, SCENARIO_IDS, VULNS } from './data'
 import * as E from './engine'
 import type { Playability, StepOutcome } from './engine'
 import type { CardId, GameState, MissionId, ScenarioId, Tri } from './types'
@@ -279,13 +279,27 @@ async function showBanner(text: string, tone: BannerState['tone'], sub?: string,
 
 // ───────────────────────── 開局與流程 ─────────────────────────
 
-/** 開始新的一局：企業情境與任務都是隨機抽的 */
+/** 開始新的一局：企業情境與任務都是隨機抽的（開場介紹時還能再換） */
 export function startGame() {
   sfx.unlock()
   const scenario = SCENARIO_IDS[Math.floor(Math.random() * SCENARIO_IDS.length)] as ScenarioId
+  dealGame(scenario)
+}
+
+/** 開場介紹時，用上下箭頭換目標企業或任務：照新的組合重新發一局 */
+export function cycleIntro(kind: 'scenario' | 'mission', step: 1 | -1) {
+  const s = game.s
+  if (!s || !ui.intro) return
+  const wrap = <T>(list: readonly T[], cur: T) => list[(list.indexOf(cur) + step + list.length) % list.length]
+  sfx.pick()
+  if (kind === 'scenario') dealGame(wrap(SCENARIO_IDS, s.scenario), s.mission)
+  else dealGame(s.scenario, wrap(MISSION_IDS, s.mission))
+}
+
+function dealGame(scenario: ScenarioId, mission?: MissionId) {
   game.scenario = scenario
-  game.mission = null
-  const s = E.newGame({ scenario })
+  game.mission = mission ?? null
+  const s = E.newGame({ scenario, mission })
   game.s = s
   game.screen = 'game'
   ui.result = null
@@ -354,9 +368,11 @@ export function playerHasMoves(s: GameState): boolean {
 
 /** 為什麼這張牌現在打不出去（給提示用） */
 export function deadReason(s: GameState, id: CardId): string {
-  const infra = E.node(s, 'infra')
   const db = E.node(s, 'db')
-  const boss = E.node(s, 'boss')
+  const infraCtrl = E.infraCtrl(s)
+  const execCtrl = E.execCtrl(s)
+  // 還沒開放的基礎設施／AI：指定目標的牌會被層級擋住
+  const infraOpen = E.infras(s).some((n) => E.reachKnown(s, n) === 'Y')
   const canReveal = (n: (typeof s.nodes)[number]) => E.canRecon(s, n) && !n.sealed && E.hiddenIdx(n).length > 0
   const hasLockedReveal = (onlyEmployees = false) =>
     s.nodes.some((n) => (!onlyEmployees || E.isEmployee(n)) && !E.canRecon(s, n) && !n.sealed && E.hiddenIdx(n).length > 0)
@@ -368,9 +384,10 @@ export function deadReason(s: GameState, id: CardId): string {
   }
   switch (id) {
     case 'virus':
-      return infra.virus ? '病毒已經在運作' : '需要先控制基礎設施與任一員工'
+      if (!infraCtrl) return '需要先控制基礎設施與任一員工'
+      return E.infras(s).every((n) => !n.controlled || n.virus) ? '已控制的基礎設施都已經有病毒在運作' : '需要先控制任一員工'
     case 'alarm':
-      return E.node(s, 'it').paralyzed > 1 ? 'IT 管理員仍在癱瘓中' : '需要基礎設施與員工入口，請查看牌面前置條件'
+      return E.node(s, 'it').paralyzed > 1 ? `${E.node(s, 'it').name}仍在癱瘓中` : '需要基礎設施與員工入口，請查看牌面前置條件'
     case 'wipe':
       return E.node(s, 'backup').paralyzed > 0 ? '備份已經癱瘓' : '尚未取得破壞備份所需的入口或權限，請查看牌面條件'
     case 'ransom':
@@ -378,11 +395,11 @@ export function deadReason(s: GameState, id: CardId): string {
     case 'exfil':
       return '需要先控制一名員工與資料庫'
     case 'wreck':
-      return infra.controlled ? 'IT 管理員還能應變：先控制他，或同回合癱瘓他' : '需要先控制基礎設施'
+      return infraCtrl ? 'IT 還能應變：先控制他，或同回合癱瘓他' : '需要先控制基礎設施'
     case 'bec':
-      if (!infra.controlled && !boss.controlled) return '需要先控制基礎設施與主管'
-      if (!infra.controlled) return '需要先控制基礎設施'
-      if (!boss.controlled) return '需要先控制主管'
+      if (!infraCtrl && !execCtrl) return '需要先控制基礎設施與主管級員工'
+      if (!infraCtrl) return '需要先控制基礎設施'
+      if (!execCtrl) return '需要先控制主管級員工'
       return '沒有可攻擊且有「好騙」弱點的員工'
     case 'lateral':
       return '選擇已控制節點；同層或下方一層須有未控制節點'
@@ -391,15 +408,15 @@ export function deadReason(s: GameState, id: CardId): string {
     case 'cred':
       return '目前沒有可攻擊且符合弱點條件的目標；先建立入口或尋找其他目標'
     case 'usb':
-      if (E.reachKnown(s, infra) !== 'Y') return '基礎設施尚未開放；先控制外圍節點或揭露通往它的捷徑'
+      if (!infraOpen) return '基礎設施尚未開放；先控制外圍節點或揭露通往它的捷徑'
       return '需要先控制員工，或嘗試可接觸且離席未鎖屏的員工端'
     case 'tail':
-      if (E.reachKnown(s, infra) !== 'Y') return '基礎設施尚未開放；先控制外圍節點或揭露通往它的捷徑'
-      return `需要選擇有「${VULNS.kind.name}」弱點的員工`
+      if (!infraOpen) return '基礎設施尚未開放；先控制外圍節點或揭露通往它的捷徑'
+      return `可接觸的員工都沒有「${VULNS.kind.name}」弱點`
     case 'inject':
-      return `需要控制 IT，或 AI 有「${VULNS.obey.name}」／「${VULNS.nohuman.name}」弱點`
+      return `需要控制 IT，或可攻擊的 AI 有「${VULNS.obey.name}」／「${VULNS.nohuman.name}」弱點`
     case 'skill':
-      return `需要控制員工，或 AI 有「${VULNS.selfupd.name}」弱點`
+      return `需要控制員工，或可攻擊的 AI 有「${VULNS.selfupd.name}」弱點`
     case 'scan':
       return revealReason()
     case 'osint':
@@ -413,7 +430,9 @@ export function deadReason(s: GameState, id: CardId): string {
       return `可偵查員工都沒有「${VULNS.gullible.name}」或「${VULNS.oversharer.name}」弱點`
     }
     case 'ally':
-      return '已經沒有蓋著的牌可以揭露'
+      return E.ais(s).some((n) => !E.canRecon(s, n) && !n.sealed && E.hiddenIdx(n).length > 0)
+        ? 'AI 所在層尚未開放偵查；先控制前一層節點'
+        : '已經沒有蓋著的牌可以揭露'
     case 'wipelog':
     case 'proxy':
       return '警戒值已經是 0'
@@ -659,8 +678,7 @@ async function commitPlayInner(uid: number, targetId?: string, from?: CastSpec['
 
   // 飛行的終點：目標節點；不用選目標的牌，飛向它實際影響的節點
   const ef = preview?.effect
-  const tailResultId = id === 'tail' && ef?.ok ? ef.captured[0] ?? ef.paralyzed : null
-  const aimId = tailResultId ?? targetId ?? ef?.captured[0] ?? ef?.paralyzed ?? ef?.revealed[0]?.node ?? E.hintNodes(s, id)[0] ?? null
+  const aimId = targetId ?? ef?.captured[0] ?? ef?.paralyzed ?? ef?.revealed[0]?.node ?? E.hintNodes(s, id)[0] ?? null
   const aimRect = SUPPORT_AIM[id] ? anchorRect(SUPPORT_AIM[id]!) : aimId ? nodeRect(aimId) : null
   const tx = aimRect ? aimRect.cx : boardCenter()
   const ty = aimRect ? aimRect.cy : 420
@@ -746,11 +764,12 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
     } else if (ef.paralyzed) {
       sfx.paralyze()
       flashNode(ef.paralyzed, 'paralyze', 1500)
+      const role = E.node(s, ef.paralyzed).role
       notes.set(ef.paralyzed, {
-        title: ef.paralyzed === 'infra' ? '網路中斷' : '癱瘓',
-        sub: ef.paralyzed === 'it'
+        title: role === 'infra' ? '網路中斷' : '癱瘓',
+        sub: role === 'it'
           ? `修復與奪回暫停 ${IT_PARALYZE_TURNS} 回合`
-          : ef.paralyzed === 'infra'
+          : role === 'infra'
             ? `修復與奪回暫停 ${INFRA_PARALYZE_TURNS} 回合`
             : `約 ${BACKUP_RESTORE_TURNS} 回合後才會恢復`,
         tone: 'ice',
@@ -759,8 +778,9 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
       })
     } else if (ef.virus) {
       sfx.infect()
-      flashNode('infra', 'infect', 1900)
-      notes.set('infra', { title: '被感染', sub: '病毒開始潛伏，每回合回報一個弱點', tone: 'virus', icon: 'bug', style: 'stamp' })
+      const infected = r.target ?? 'infra'
+      flashNode(infected, 'infect', 1900)
+      notes.set(infected, { title: '被感染', sub: '病毒開始潛伏，每回合回報一個弱點', tone: 'virus', icon: 'bug', style: 'stamp' })
     } else if (ef.finish) {
       sfx.success()
       const id = aimId ?? 'db'
@@ -979,15 +999,16 @@ async function presentStep(step: StepOutcome) {
   switch (step.t) {
     case 'frozen': {
       const infraPaused = step.reason === 'infraParalyzed'
-      const anchor = nodeRect(infraPaused ? 'infra' : 'it')
+      const downInfra = E.infras(s).find((n) => n.paralyzed > 0)
+      const anchor = nodeRect(infraPaused && downInfra ? downInfra.id : 'it')
       if (anchor) {
         plaque(anchor.cx, anchor.cy - 6, {
           title: step.both ? '公司全面停擺' : '修復暫停',
           sub: infraPaused
             ? '網路中斷：修復與奪回都停了'
             : step.both
-              ? 'IT 管理員被癱瘓：修復與奪回都停了'
-              : 'IT 管理員被你控制',
+              ? `${E.node(s, 'it').name}被癱瘓：修復與奪回都停了`
+              : `${E.node(s, 'it').name}被你控制`,
           tone: 'ice',
           icon: 'snowflake',
           style: 'tag',
@@ -1028,13 +1049,16 @@ async function presentStep(step: StepOutcome) {
     }
     case 'standing': {
       if (step.revealed.length) {
-        // 病毒觸發：基礎設施先脈動一下 → 封包飛向被翻開的弱點 → 該格亮起，並寫出翻到了什麼
-        const inf = nodeRect('infra')
+        // 病毒觸發：被感染的基礎設施先脈動一下 → 封包飛向被翻開的弱點 → 該格亮起，並寫出翻到了什麼
         sfx.virusPing()
-        flashNode('infra', 'pulse', 1100)
-        if (inf) plaque(inf.cx, inf.cy - 6, { title: '病毒觸發', sub: '賽博病毒回報中', tone: 'virus', icon: 'bug', style: 'tag' }, 1500)
+        for (const id of new Set(step.from)) {
+          const inf = nodeRect(id)
+          flashNode(id, 'pulse', 1100)
+          if (inf) plaque(inf.cx, inf.cy - 6, { title: '病毒觸發', sub: '賽博病毒回報中', tone: 'virus', icon: 'bug', style: 'tag' }, 1500)
+        }
         await wait(650)
-        for (const r of step.revealed) {
+        for (const [i, r] of step.revealed.entries()) {
+          const inf = nodeRect(step.from[i])
           const sp = slotPos(r.node, r.idx)
           if (inf && sp) beam(inf.cx, inf.cy, sp.x, sp.y)
           await wait(520)

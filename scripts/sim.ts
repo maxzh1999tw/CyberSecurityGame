@@ -56,7 +56,7 @@ function bestChoice(s: GameState): Choice | null {
         sc = o.tri === 'Y' ? 100 - noise * 6 : s.alert <= 3 && noise <= 2 ? 30 - noise * 8 : 0
         if (c.id === 'lateral' && o.tri === 'M') sc -= 10
         // 已控制的目標快被奪回時才延長，避免電腦玩家反覆續控而不推進任務。
-        const target = o.target ?? (c.id === 'usb' ? 'infra' : c.id === 'inject' || c.id === 'skill' ? 'ai' : null)
+        const target = o.target ?? null
         if (c.id !== 'lateral' && target && node(s, target).controlled) {
           const n = node(s, target)
           sc = o.tri === 'Y' && n.timer <= 2 * recaptureSpeedOf(s, n) ? 55 - noise * 6 : 0

@@ -6,6 +6,7 @@ import type {
   MissionId,
   NodeKind,
   NodeRole,
+  NodeTemplate,
   ScenarioDef,
   ScenarioId,
   VulnDef,
@@ -101,7 +102,7 @@ export const VULNS: Record<VulnId, VulnDef> = {
     name: '簡單密碼',
     kind: 'infra',
     kinds: ['employee', 'infra', 'data'],
-    roles: ['sales', 'engineer', 'boss', 'it', 'infra', 'db', 'backup'],
+    roles: ['sales', 'engineer', 'boss', 'chairman', 'it', 'infra', 'db', 'backup'],
     icon: 'key',
     desc: '員工帳號、設備或資料庫使用容易被猜中的簡單密碼',
     shield: '已禁用預設與弱密碼',
@@ -124,7 +125,7 @@ export const VULNS: Record<VulnId, VulnDef> = {
     name: '爛系統',
     kind: 'infra',
     kinds: ['employee', 'infra', 'data'],
-    roles: ['sales', 'engineer', 'boss', 'it', 'infra', 'db', 'backup'],
+    roles: ['sales', 'engineer', 'boss', 'chairman', 'it', 'infra', 'db', 'backup'],
     icon: 'bug',
     desc: '內部系統有已知的資安漏洞',
     shield: '已完成安全檢測',
@@ -136,7 +137,7 @@ export const VULNS: Record<VulnId, VulnDef> = {
     name: '老古董',
     kind: 'infra',
     kinds: ['employee', 'infra', 'data'],
-    roles: ['sales', 'engineer', 'boss', 'it', 'infra', 'db', 'backup'],
+    roles: ['sales', 'engineer', 'boss', 'chairman', 'it', 'infra', 'db', 'backup'],
     icon: 'hourglass',
     desc: '軟體沒有定期安裝更新',
     shield: '已啟用自動更新',
@@ -153,7 +154,7 @@ export const VULNS: Record<VulnId, VulnDef> = {
     kind: 'infra',
     icon: 'globe',
     desc: '遠端連線直接對外開放，又沒有雙重驗證',
-    rule: '不需要先控制外圍節點，就能直接攻擊基礎設施',
+    rule: '不需要先控制外圍節點，就能直接攻擊這個基礎設施',
     shield: '已使用 VPN 與雙重驗證',
     fix: '遠端連線走 VPN 並加上雙重驗證，不直接對外開放',
     tomorrow: '確認自己的遠端連線有開雙重驗證',
@@ -225,7 +226,7 @@ export const VULNS: Record<VulnId, VulnDef> = {
     kind: 'ai',
     icon: 'key-square',
     desc: 'AI 可以存取任何資料、執行任何操作',
-    rule: '控制 AI 助理後，可以直接對資料庫出牌，不受層級限制',
+    rule: '控制這個 AI 後，可以直接對資料庫出牌，不受層級限制',
     shield: '已限制 AI 權限',
     fix: '給 AI 最小權限，每個工具分開授權',
     tomorrow: '檢查你授權給 AI 工具的權限，用不到的收回',
@@ -330,9 +331,9 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 2,
     noise: 1,
     icon: 'bot',
-    effect: '揭露 AI 助理的 1 個弱點；若有{v:selfupd}或{v:obey}，改為 2 個',
+    effect: '揭露目標 AI 的 1 個弱點；若有{v:selfupd}或{v:obey}，改為 2 個',
     trivia: 'AI 工具的權限與外掛，常常沒有被納入資安盤點',
-    targeting: 'auto',
+    targeting: 'node',
   }),
   virus: c({
     id: 'virus',
@@ -342,10 +343,10 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 2,
     noise: 1,
     icon: 'bug',
-    cond: '控制員工與基礎設施',
-    effect: '每回合揭露開放層級 1 個隨機弱點',
+    cond: '選擇已控制的基礎設施；且已控制員工',
+    effect: '在目標植入病毒：每回合揭露開放層級 1 個隨機弱點',
     trivia: '由員工端植入的程式可長期潛伏，持續蒐集資訊',
-    targeting: 'auto',
+    targeting: 'node',
   }),
   // ───── 行動 ─────
   phish: c({
@@ -408,8 +409,8 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 1,
     noise: 1,
     icon: 'door-open',
-    cond: '目標員工有{v:kind}；基礎設施已開放',
-    effect: '各半機率控制基礎設施，或癱瘓它 2 回合',
+    cond: '可接觸的員工有{v:kind}；目標基礎設施已開放',
+    effect: '各半機率控制目標基礎設施，或癱瘓它 2 回合',
     trivia: '趁員工替陌生人開門進入設備區，可能接管或中斷設備；中斷期間公司修復與奪回暫停。訪客應自行驗證身分',
     targeting: 'node',
   }),
@@ -434,10 +435,10 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 1,
     noise: 1,
     icon: 'terminal',
-    cond: '已控制 IT，或 AI 有{v:obey}或{v:nohuman}',
-    effect: '控制 AI 助理',
+    cond: '已控制 IT，或目標 AI 有{v:obey}或{v:nohuman}',
+    effect: '控制目標 AI',
     trivia: '惡意提示可操縱 AI；控制 IT 也能改寫系統指令',
-    targeting: 'auto',
+    targeting: 'node',
   }),
   skill: c({
     id: 'skill',
@@ -447,10 +448,10 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 2,
     noise: 1,
     icon: 'puzzle',
-    cond: '已控制員工，或 AI 有{v:selfupd}',
-    effect: '控制 AI 助理',
+    cond: '已控制員工，或目標 AI 有{v:selfupd}',
+    effect: '控制目標 AI',
     trivia: '瀏覽器套件、AI 外掛、技能市集，都是供應鏈攻擊的入口',
-    targeting: 'auto',
+    targeting: 'node',
   }),
   usb: c({
     id: 'usb',
@@ -461,9 +462,9 @@ export const CARDS: Record<CardId, CardDef> = {
     noise: 2,
     icon: 'usb',
     cond: '已控制員工，或可接觸的員工有{v:lazy}',
-    effect: '控制基礎設施',
+    effect: '控制目標基礎設施',
     trivia: '利用受控員工端，或無人看守且未鎖定的電腦植入惡意程式，建立基礎設施入口；離席應鎖屏，陌生 USB 不要插',
-    targeting: 'auto',
+    targeting: 'node',
   }),
   exploit: c({
     id: 'exploit',
@@ -500,7 +501,7 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 2,
     noise: 2,
     icon: 'siren',
-    cond: '控制基礎設施與一名非 IT 員工',
+    cond: '控制任一基礎設施與一名非 IT 員工',
     effect: '癱瘓 IT 2 回合，暫停修復與奪回',
     trivia: '先利用員工帳號散播假警報，讓真正的警報被淹沒（警報疲勞）',
     targeting: 'auto',
@@ -513,8 +514,8 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 2,
     noise: 3,
     icon: 'database-backup',
-    cond: '控制基礎設施，且控制 IT 或資料庫',
-    effect: '癱瘓備份約 6 回合；IT、基礎設施、資料庫奪回速度減半',
+    cond: '控制任一基礎設施，且控制 IT 或資料庫',
+    effect: '癱瘓備份約 6 回合；IT、所有基礎設施、資料庫奪回速度減半',
     trivia: '攻擊者在勒索之前，常會先找到並破壞備份',
     targeting: 'auto',
   }),
@@ -540,7 +541,7 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 2,
     noise: 2,
     icon: 'banknote',
-    cond: '控制主管與基礎設施；目標員工有{v:gullible}',
+    cond: '控制主管級員工與任一基礎設施；目標員工有{v:gullible}',
     effect: '以主管名義要求轉帳並得手',
     trivia: '接管 Teams 冒充主管要求轉帳；收到匯款指示，應用另一管道確認',
     targeting: 'node',
@@ -553,10 +554,10 @@ export const CARDS: Record<CardId, CardDef> = {
     cost: 3,
     noise: 4,
     icon: 'server-crash',
-    cond: '控制基礎設施；IT 已控制或癱瘓',
+    cond: '選擇已控制的基礎設施；IT 已控制或癱瘓',
     effect: '使公司服務停擺',
     trivia: '破壞性攻擊的目的不是勒索，而是讓營運停擺；沒有人能即時處理，損失會更大',
-    targeting: 'auto',
+    targeting: 'node',
   }),
   exfil: c({
     id: 'exfil',
@@ -660,8 +661,8 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
     id: 'bossfraud',
     name: '假老闆詐騙',
     icon: 'banknote',
-    story: '先控制主管與基礎設施、接管公司 Teams，再冒充老闆指示好騙員工匯款。',
-    goal: '控制主管與基礎設施，對有「好騙」的員工打出「假冒轉帳」',
+    story: '先控制主管級員工與基礎設施、接管公司 Teams，再冒充老闆指示好騙員工匯款。',
+    goal: '控制主管級員工與任一基礎設施，對有「好騙」的員工打出「假冒轉帳」',
     teaches: '變臉詐騙',
     finisher: 'bec',
   },
@@ -679,13 +680,28 @@ export const MISSIONS: Record<MissionId, MissionDef> = {
     name: '癱瘓服務',
     icon: 'server-crash',
     story: '有人要讓這家公司的服務停擺。趁 IT 人員來不及應變的那一刻，一擊癱瘓整套系統。',
-    goal: '控制基礎設施，趁 IT 管理員無法應變（被你控制或癱瘓）時打出「系統破壞」，讓公司服務停擺',
+    goal: '控制任一基礎設施，趁 IT 無法應變（被你控制或癱瘓）時對它打出「系統破壞」，讓公司服務停擺',
     teaches: '事故應變的重要',
     finisher: 'wreck',
   },
 }
 
 export const MISSION_IDS = Object.keys(MISSIONS) as MissionId[]
+
+// 各公司的節點配置。規則依角色判斷，所以同一種角色可以出現好幾個（例如兩套基礎設施、兩個 AI）。
+// 名稱要對得上卡牌與任務的用語：設備與資料一律叫「基礎設施／資料庫／備份」、AI 以「AI」開頭、IT 以「IT」開頭；
+// 只有員工換成各公司自己的人。
+// 外圍：一般員工與對外的 AI；內網：IT、基礎設施與較難接觸的高層；核心：資料庫與備份。
+// art：這間公司專屬的頭像（見 NodeArt.vue）
+const n = (id: string, name: string, role: NodeRole, kind: NodeKind, layer: NodeTemplate['layer'], draw = 3, art?: string): NodeTemplate => ({
+  id,
+  name,
+  role,
+  kind,
+  layer,
+  draw,
+  ...(art ? { art } : {}),
+})
 
 export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
   factory: {
@@ -694,19 +710,31 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     company: '鼎盛金屬工業',
     icon: 'factory',
     tagline: '老古董特別多',
-    story: '三十年的老字號金屬加工廠。辦公室和產線裡還有不少用了十幾年的老設備，IT 只有一位管理員兼任，訂單與設計圖全放在公司的伺服器裡。',
+    story: '三十年的老字號金屬加工廠。辦公室和產線各有一套基礎設施，裡面還有不少用了十幾年的老設備；IT 只有一位管理員兼任，大小事都要董事長親自批，訂單與設計圖全放在公司的資料庫裡。',
     hue: 28,
     vulnCopies: {
       legacy: 3,
       buggy: 2,
       weakpw: 2,
-      nolog: 2,
+      // 有兩套基礎設施，「沒人看紀錄」本來就容易抽到，不再加重
       lazy: 2,
       samepw: 2,
       nobackup: 2,
       allaccess: 2,
     },
     shieldCopies: {},
+    // 老字號沒導入 AI；董事長坐鎮內網，辦公室與產線各有一套基礎設施
+    layout: [
+      n('sales', '會計阿惠', 'sales', 'employee', 0, 3, 'clerk'),
+      n('engineer', '領班老陳', 'engineer', 'employee', 0, 3, 'worker'),
+      n('boss', '王廠長', 'boss', 'employee', 0, 3, 'plantboss'),
+      n('chairman', '董事長', 'chairman', 'employee', 1),
+      n('it', 'IT 阿志', 'it', 'employee', 1),
+      n('infra', '辦公基礎設施', 'infra', 'infra', 1),
+      n('ot', '產線基礎設施', 'infra', 'infra', 1),
+      n('db', '資料庫', 'db', 'data', 2),
+      n('backup', '備份', 'backup', 'data', 2, 2),
+    ],
   },
   startup: {
     id: 'startup',
@@ -714,7 +742,7 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     company: '光速智能科技',
     icon: 'rocket',
     tagline: 'AI 全自動，速度第一',
-    story: '成立兩年的新創，什麼都要快。信件、報價、客服都交給 AI 助理處理，員工多半遠端上班，權限開得很寬，資安還排不上進度。',
+    story: '成立兩年的新創，什麼都要快。客服交給 AI 客服、程式交給 AI 工程師自動部署，員工多半遠端上班，權限開得很寬，資安還排不上進度。',
     hue: 285,
     vulnCopies: {
       obey: 2,
@@ -727,6 +755,18 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
       nobackup: 2,
     },
     shieldCopies: {},
+    // 兩個 AI：對外的 AI 客服在外圍，能碰程式與部署的 AI 工程師在內網
+    layout: [
+      n('sales', '行銷 Amy', 'sales', 'employee', 0, 3, 'marketer'),
+      n('engineer', '工程師 Leo', 'engineer', 'employee', 0, 3, 'dev'),
+      n('boss', '執行長 Max', 'boss', 'employee', 0, 3, 'ceo'),
+      n('ai', 'AI 客服', 'ai', 'ai', 0),
+      n('it', 'IT 阿凱', 'it', 'employee', 1, 3, 'devops'),
+      n('infra', '基礎設施', 'infra', 'infra', 1),
+      n('agent', 'AI 工程師', 'ai', 'ai', 1),
+      n('db', '資料庫', 'db', 'data', 2),
+      n('backup', '備份', 'backup', 'data', 2, 2),
+    ],
   },
   hospital: {
     id: 'hospital',
@@ -734,7 +774,7 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
     company: '安心綜合醫院',
     icon: 'hospital',
     tagline: '病歷就是金礦',
-    story: '每天上千名病患進出的區域醫院。病歷系統和醫療設備一刻都不能停，院內有許多共用電腦與老系統，員工輪班、人來人往。',
+    story: '每天上千名病患進出的區域醫院。院內網路與醫療設備各有一套基礎設施，病歷資料庫一刻都不能停，院內有許多共用電腦與老系統，員工輪班、人來人往，院長室則在管制區裡。',
     hue: 170,
     vulnCopies: {
       legacy: 2,
@@ -747,6 +787,19 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
       allaccess: 2,
     },
     shieldCopies: {},
+    // 第一線人員多；院長在內網；院內網路之外還有一套醫療設備的基礎設施
+    layout: [
+      n('nurse', '護理師小芳', 'sales', 'employee', 0, 3, 'nurse'),
+      n('clerk', '櫃台阿珠', 'sales', 'employee', 0),
+      n('doctor', '醫師阿哲', 'engineer', 'employee', 0, 3, 'doctor'),
+      n('ai', 'AI 助理', 'ai', 'ai', 0),
+      n('boss', '陳院長', 'boss', 'employee', 1, 3, 'director'),
+      n('it', 'IT 阿德', 'it', 'employee', 1, 3, 'medit'),
+      n('infra', '院內基礎設施', 'infra', 'infra', 1),
+      n('med', '醫療基礎設施', 'infra', 'infra', 1),
+      n('db', '資料庫', 'db', 'data', 2),
+      n('backup', '備份', 'backup', 'data', 2, 2),
+    ],
   },
   school: {
     id: 'school',
@@ -766,31 +819,22 @@ export const SCENARIOS: Record<ScenarioId, ScenarioDef> = {
       allaccess: 2,
     },
     shieldCopies: {},
+    // 外圍人最多：老師、職員、學生和校長都碰得到
+    layout: [
+      n('teacher', '林老師', 'sales', 'employee', 0, 3, 'teacher'),
+      n('clerk', '教務組長', 'sales', 'employee', 0, 3, 'clerk'),
+      n('student', '學生小傑', 'engineer', 'employee', 0, 2, 'student'),
+      n('boss', '張校長', 'boss', 'employee', 0),
+      n('ai', 'AI 助理', 'ai', 'ai', 0, 2),
+      n('it', 'IT 王老師', 'it', 'employee', 1, 3, 'itteacher'),
+      n('infra', '基礎設施', 'infra', 'infra', 1),
+      n('db', '資料庫', 'db', 'data', 2),
+      n('backup', '備份', 'backup', 'data', 2, 2),
+    ],
   },
 }
 
 export const SCENARIO_IDS = Object.keys(SCENARIOS) as ScenarioId[]
-
-/** 開局節點配置 */
-export interface NodeTemplate {
-  id: string
-  name: string
-  role: NodeRole
-  kind: NodeKind
-  layer: 0 | 1 | 2
-  draw: number
-}
-
-export const NODE_TEMPLATES: NodeTemplate[] = [
-  { id: 'sales', name: '業務小美', role: 'sales', kind: 'employee', layer: 0, draw: 3 },
-  { id: 'engineer', name: '工程師阿明', role: 'engineer', kind: 'employee', layer: 0, draw: 3 },
-  { id: 'boss', name: '主管', role: 'boss', kind: 'employee', layer: 0, draw: 3 },
-  { id: 'ai', name: 'AI 助理', role: 'ai', kind: 'ai', layer: 0, draw: 3 },
-  { id: 'it', name: 'IT 管理員', role: 'it', kind: 'employee', layer: 1, draw: 3 },
-  { id: 'infra', name: '基礎設施', role: 'infra', kind: 'infra', layer: 1, draw: 3 },
-  { id: 'db', name: '資料庫', role: 'db', kind: 'data', layer: 2, draw: 3 },
-  { id: 'backup', name: '備份', role: 'backup', kind: 'data', layer: 2, draw: 2 },
-]
 
 export const LAYER_NAMES = ['外圍', '內網', '核心'] as const
 export const STAGES = ['偵查', '入侵', '擴散', '潛伏', '得手'] as const
@@ -832,6 +876,7 @@ export const NODE_RISK: Record<NodeRole, Risk> = {
   sales: { notice: 1, severe: 1 },
   engineer: { notice: 1, severe: 2 },
   boss: { notice: 2, severe: 2 },
+  chairman: { notice: 2, severe: 3 },
   ai: { notice: 2, severe: 3 },
   it: { notice: 2, severe: 3 },
   infra: { notice: 3, severe: 2 },

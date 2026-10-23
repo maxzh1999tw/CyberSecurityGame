@@ -3,7 +3,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { sfx } from '../audio/sfx'
 import { CARDS } from '../game/data'
-import { knownHas, node, playability } from '../game/engine'
+import { knownHas, noLogs, playability } from '../game/engine'
 import type { Playability } from '../game/engine'
 import { anchorRect, boardCenter, cancelPointerDrag, game, handOrigin, playLine, pointerDownCard, ui, view } from '../game/store'
 import type { CardInst } from '../game/types'
@@ -303,7 +303,7 @@ function onLeave(uid: number) {
 // 只有在「沒人看紀錄」已被揭露時，牌面才顯示減半後的噪音（不能洩漏還蓋著的資訊）
 const nolog = computed(() => {
   const st = s.value
-  return st ? knownHas(node(st, 'infra'), 'nolog') === 'Y' : false
+  return st ? noLogs(st, knownHas) === 'Y' : false
 })
 
 onMounted(() => {

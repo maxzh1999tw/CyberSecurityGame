@@ -2,7 +2,7 @@
 // 右欄：公司的反應（反應速度、IT 管理員狀態、所有進行中的倒數）
 import { computed } from 'vue'
 import { SCENARIOS, VULNS } from '../game/data'
-import { alertZone, node, speedOf, upcoming } from '../game/engine'
+import { alertZone, infras, node, speedOf, upcoming } from '../game/engine'
 import { game } from '../game/store'
 import Icon from './Icon.vue'
 
@@ -18,20 +18,21 @@ const zone = computed(() => alertZone(s.value.alert))
 const speed = computed(() => speedOf(s.value))
 
 const it = computed(() => node(s.value, 'it'))
-const infra = computed(() => node(s.value, 'infra'))
+// 任一套基礎設施中斷，公司就無法應變
+const downInfra = computed(() => infras(s.value).find((n) => n.paralyzed > 0) ?? null)
 const blockState = computed(() => {
-  if (infra.value.paralyzed > 0) {
+  if (downInfra.value) {
     return {
       tone: 'ice',
       icon: 'snowflake',
-      title: '公司網路',
-      text: `中斷中 ${infra.value.paralyzed} 回合`,
+      title: downInfra.value.name,
+      text: `中斷中 ${downInfra.value.paralyzed} 回合`,
       sub: '修復與奪回暫停',
     }
   }
-  if (it.value.paralyzed > 0) return { tone: 'ice', icon: 'snowflake', title: 'IT 管理員', text: `癱瘓中 ${it.value.paralyzed} 回合`, sub: '修復與奪回全部暫停' }
-  if (it.value.controlled) return { tone: 'mine', icon: 'skull', title: 'IT 管理員', text: '被你控制', sub: '公司無法修復弱點' }
-  return { tone: 'ok', icon: 'wrench', title: 'IT 管理員', text: '正常運作', sub: '' }
+  if (it.value.paralyzed > 0) return { tone: 'ice', icon: 'snowflake', title: it.value.name, text: `癱瘓中 ${it.value.paralyzed} 回合`, sub: '修復與奪回全部暫停' }
+  if (it.value.controlled) return { tone: 'mine', icon: 'skull', title: it.value.name, text: '被你控制', sub: '公司無法修復弱點' }
+  return { tone: 'ok', icon: 'wrench', title: it.value.name, text: '正常運作', sub: '' }
 })
 
 const list = computed(() =>

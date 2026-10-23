@@ -20,6 +20,14 @@ onBeforeUnmount(() => {
 const KIND_LABEL = { employee: '員工', infra: '設備', ai: 'AI', data: '資料' } as const
 const KIND_ICON = { employee: 'user-round', infra: 'server', ai: 'cpu', data: 'database' } as const
 
+// 員工名稱依公司而不同：卡牌寫「主管級」「IT」時，靠這個標籤對得上是誰
+const kindTag = computed(() => {
+  const nd = props.node
+  if (nd.role === 'boss' || nd.role === 'chairman') return { icon: 'crown', text: '主管' }
+  if (nd.role === 'it') return { icon: 'wrench', text: 'IT' }
+  return { icon: KIND_ICON[nd.kind], text: KIND_LABEL[nd.kind] }
+})
+
 const n = computed(() => props.node)
 
 // 命中時疊在節點上的特效種類（capture / infect / pulse / paralyze / fail / recapture / restore）
@@ -33,6 +41,7 @@ const BUGS = Array.from({ length: 8 }, (_, i) => {
 const ability = computed(() => {
   const nd = n.value
   if (nd.role === 'boss') return { icon: 'crown', text: '−1' }
+  if (nd.role === 'chairman') return { icon: 'hand-coins', text: '−1' }
   if (nd.kind === 'employee' && nd.role !== 'it') return { icon: 'zap', text: '+1' }
   if (nd.role === 'it') return { icon: 'wrench', text: '' }
   if (nd.role === 'infra') return { icon: 'bug', text: '' }
@@ -151,14 +160,14 @@ function leave() {
   >
     <div class="head">
       <div class="avatar">
-        <NodeArt :role="n.role" />
+        <NodeArt :art="n.art ?? n.role" />
         <div v-if="locked" class="lock"><Icon name="lock" :size="16" :stroke="2.6" /></div>
         <div v-if="n.controlled" class="hack"><Icon name="skull" :size="15" :stroke="2.6" /></div>
       </div>
-      <div class="info">
+      <div class="info" :class="{ badged: ability }">
         <div class="name">{{ n.name }}</div>
         <div class="sub">
-          <span class="kind"><Icon :name="KIND_ICON[n.kind]" :size="16" :stroke="2.4" />{{ KIND_LABEL[n.kind] }}</span>
+          <span class="kind"><Icon :name="kindTag.icon" :size="16" :stroke="2.4" />{{ kindTag.text }}</span>
           <span v-if="n.controlled" class="pill ctrl" title="公司奪回的倒數">
             已控制<span class="eta" :key="recapEta">
               <Icon :name="cFrozen ? 'snowflake' : 'timer'" :size="14" :stroke="2.6" />{{ cFrozen ? '' : recapEta }}
@@ -339,6 +348,10 @@ function leave() {
 .info {
   flex: 1;
   min-width: 0;
+}
+/* 右上角的能力徽章疊在標題列上：名稱要在它前面就截斷 */
+.info.badged {
+  padding-right: 30px;
 }
 .name {
   font-size: 22px;

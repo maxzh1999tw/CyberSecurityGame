@@ -1,15 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { CARDS, MISSION_IDS, MISSIONS, SCENARIO_IDS, NODE_RISK, recaptureTurnsOf, repairTurnsOf, vulnPool } from '../src/game/data.ts'
+import { CARDS, MISSION_IDS, MISSIONS, SCENARIOS, SCENARIO_IDS, NODE_RISK, recaptureTurnsOf, repairTurnsOf, vulnPool } from '../src/game/data.ts'
 import {
   HAND_MAX, OPENING_HAND, apBonusOf, backupUnavailable, canEndTurn, canHave, canRecon, canRecycle, cardCost, ctrlCount, dbAccess, drawCards, effective, endOfTurn, endTurn,
   hintNodes, holdNeeded, isFree, isMissionCard, knownHas, newGame, startHackerTurn,
-  node, playCard, playability, predict, reachKnown, recaptureBlock, recaptureSpeedOf, recycleCard, repairBlock, resolve, routeExists, speedOf, upcoming, uselessCards,
+  node, playCard, playability, predict as enginePredict, reachKnown, recaptureBlock, recaptureSpeedOf, recycleCard, repairBlock, resolve, routeExists, speedOf, upcoming, uselessCards,
 } from '../src/game/engine.ts'
-import type { CardId, GameState, MissionId, NodeRole, VulnId } from '../src/game/types.ts'
+import type { CardId, GameState, MissionId, NodeRole, ScenarioId, VulnId } from '../src/game/types.ts'
 
 function world(mission: MissionId = 'espionage'): GameState {
-  const s = newGame({ seed: 1234, scenario: 'factory', mission })
+  // 標準配置：外圍業務、工程師、主管、AI；內網 IT、基礎設施；核心資料庫、備份（拿掉新創的第二個 AI）。
+  const s = companyWorld('startup', mission)
+  s.nodes = s.nodes.filter((n) => n.id !== 'agent')
+  return s
+}
+
+/** 某間公司的完整配置，清空所有牌與狀態 */
+function companyWorld(scenario: ScenarioId, mission: MissionId = 'espionage'): GameState {
+  const s = newGame({ seed: 1234, scenario, mission })
   // 一般規則測試使用局中狀態；首回合限制另外以真正的新局驗證。
   s.turn = 2
   for (const n of s.nodes) {
@@ -39,10 +47,25 @@ function control(s: GameState, target: string) {
   node(s, target).controlSeq = ++s.controlSeq
 }
 
+// 這些牌改成要指定目標；標準配置裡只有一個基礎設施與一個 AI，沒寫目標時就打它們。
+const DEFAULT_TARGET: Partial<Record<CardId, string>> = {
+  usb: 'infra',
+  tail: 'infra',
+  virus: 'infra',
+  wreck: 'infra',
+  inject: 'ai',
+  skill: 'ai',
+  ally: 'ai',
+}
+
+function predict(s: GameState, id: CardId, target?: string) {
+  return enginePredict(s, id, target ?? DEFAULT_TARGET[id])
+}
+
 function play(s: GameState, id: CardId, target?: string) {
   const uid = ++s.uidSeq
   s.hand.push({ uid, id })
-  return playCard(s, uid, target)
+  return playCard(s, uid, target ?? DEFAULT_TARGET[id])
 }
 
 test('全部企業與任務：起手六張、唯一任務牌包含在內、配置仍可通關', () => {
@@ -208,7 +231,9 @@ test('任務牌未得手後，所有抽牌方式都優先抽回原卡，反覆�
         if (emptyDeck) s.deck = []
         s.ap = 20
         s.alert = 0
-        const result = playCard(s, required.uid, finisher === 'bec' ? 'sales' : undefined)
+        // 系統破壞要指定基礎設施：先讓它可達，但不控制，確保不會得手
+        if (finisher === 'wreck') control(s, 'sales')
+        const result = playCard(s, required.uid, finisher === 'bec' ? 'sales' : DEFAULT_TARGET[finisher])
         assert.equal(result.win, false, `${mission}/${drawVia}`)
         assert.ok(!s.hand.some((card) => card.uid === required.uid), '不能打出後立即回手')
         let drawn
@@ -552,16 +577,17 @@ test('USB 需要已開放基礎設施，且已控員工或可達員工的 lazy �
   assert.equal(node(knownFirst, 'sales').slots[0]!.vis, 0, '未使用的隱藏 lazy 不應被揭露')
 })
 
-test('尾隨只影響基礎設施：成功接管或癱瘓兩回合，且未開放基建時不能選目標', () => {
+test('尾隨指定基礎設施：成功接管或癱瘓兩回合，且未開放基建時不能選目標', () => {
   const locked = world('sabotage')
   weakness(locked, 'sales', 'kind')
   assert.equal(reachKnown(locked, node(locked, 'infra')), 'N')
-  assert.equal(predict(locked, 'tail', 'sales'), 'N')
-  assert.ok(!('sales' in playability(locked, 'tail').targets))
+  assert.equal(predict(locked, 'tail', 'infra'), 'N')
+  assert.equal(predict(locked, 'tail', 'sales'), 'N', '尾隨不能指定員工')
+  assert.ok(!('infra' in playability(locked, 'tail').targets))
   const tailCard = { uid: ++locked.uidSeq, id: 'tail' as const }
   locked.hand.push(tailCard)
   const beforeLockedPlay = JSON.stringify(locked)
-  assert.throws(() => playCard(locked, tailCard.uid, 'sales'), /目標尚未解鎖/)
+  assert.throws(() => playCard(locked, tailCard.uid, 'infra'), /目標尚未解鎖/)
   assert.equal(JSON.stringify(locked), beforeLockedPlay, '鎖定時拒絕出牌不消耗手牌或資源')
   assert.equal(node(locked, 'sales').controlled, false)
 
@@ -577,8 +603,8 @@ test('尾隨只影響基礎設施：成功接管或癱瘓兩回合，且未開�
     node(s, 'infra').slots[0]!.vis = 2
     s.rng = seed * 7919
     assert.equal(reachKnown(s, node(s, 'infra')), 'Y')
-    assert.equal(predict(s, 'tail', 'sales'), 'M', '未知 kind 可盲猜，但不能顯示成確定命中')
-    const result = play(s, 'tail', 'sales')
+    assert.equal(predict(s, 'tail', 'infra'), 'M', '未知 kind 可盲猜，但不能顯示成確定命中')
+    const result = play(s, 'tail', 'infra')
     assert.equal(result.effect.ok, true)
     assert.equal(node(s, 'sales').controlled, false, '尾隨不能控制員工')
     assert.equal(node(s, 'sales').slots[0]!.vis, 2, '尾隨入口弱點公開並開始修補')
@@ -641,7 +667,7 @@ test('尾隨再次接管可延長基礎設施控制，入口仍來自員工 kind
     weakness(s, 'infra', 'remote')
     node(s, 'infra').slots[0]!.vis = 2
     s.rng = seed * 7919
-    const result = play(s, 'tail', 'sales')
+    const result = play(s, 'tail', 'infra')
     if (result.effect.captured.includes('infra')) {
       capturedState = s
       captureSeed = seed * 7919
@@ -656,7 +682,7 @@ test('尾隨再次接管可延長基礎設施控制，入口仍來自員工 kind
   assert.equal(node(s, 'sales').controlled, false)
   infra.timer = 1.25
   s.rng = captureSeed
-  const repeated = play(s, 'tail', 'sales')
+  const repeated = play(s, 'tail', 'infra')
   assert.equal(repeated.effect.ok, true)
   assert.deepEqual(repeated.effect.captured, ['infra'])
   assert.deepEqual(repeated.effect.extended, ['infra'])
@@ -1309,7 +1335,7 @@ test('原本的惡意技能與 USB 穩定前置保留，沒有改成更複雜的
   control(s, 'sales')
   assert.equal(predict(s, 'skill'), 'Y')
   assert.equal(play(s, 'skill').effect.ok, true)
-  assert.equal(CARDS.usb.targeting, 'auto')
+  assert.equal(CARDS.usb.targeting, 'node', 'USB 要指定哪一個基礎設施')
   assert.equal(predict(s, 'usb'), 'Y')
   assert.deepEqual(play(s, 'usb').effect.captured, ['infra'])
 })
@@ -1365,7 +1391,7 @@ test('能言善道可賭所選員工的弱點，或先控制員工再穩定套�
 test('實際發牌仍排除無用牌，但抽到提示詞注入不再保證開局控制 AI', () => {
   const outcomes = new Set<boolean>()
   for (let seed = 1; seed <= 200 && outcomes.size < 2; seed++) {
-    const s = newGame({ seed, scenario: 'factory', mission: 'sabotage' })
+    const s = newGame({ seed, scenario: 'school', mission: 'sabotage' })
     const card = [...s.hand, ...s.deck].find((inst) => inst.id === 'inject')
     if (!card) continue
     if (!s.hand.some((inst) => inst.uid === card.uid)) {
@@ -1373,7 +1399,138 @@ test('實際發牌仍排除無用牌，但抽到提示詞注入不再保證開�
       s.hand.push(card)
     }
     assert.equal(predict(s, 'inject'), 'M')
-    outcomes.add(playCard(s, card.uid).effect.ok)
+    outcomes.add(playCard(s, card.uid, 'ai').effect.ok)
   }
   assert.equal(outcomes.size, 2, '真實開局中要同時存在盲打成功與失敗的配置')
+})
+
+test('每間公司的節點配置不同但合理：單一 IT／資料庫／備份，每層最多五個節點', () => {
+  const signatures = new Set<string>()
+  for (const scenario of SCENARIO_IDS) {
+    const layout = SCENARIOS[scenario].layout
+    const ids = layout.map((t) => t.id)
+    assert.equal(new Set(ids).size, ids.length, `${scenario} 節點 id 重複`)
+    for (const role of ['it', 'db', 'backup', 'boss'] as const) {
+      assert.equal(layout.filter((t) => t.role === role).length, 1, `${scenario} 應有一個 ${role}`)
+    }
+    assert.ok(layout.some((t) => t.role === 'infra'), `${scenario} 至少要有一個基礎設施`)
+    assert.ok(layout.filter((t) => t.kind === 'employee' && t.role !== 'it' && t.role !== 'boss' && t.role !== 'chairman').length >= 2)
+    for (const t of layout.filter((x) => x.role === 'db' || x.role === 'backup')) assert.equal(t.layer, 2)
+    for (const layer of [0, 1, 2]) assert.ok(layout.filter((t) => t.layer === layer).length <= 5, `${scenario} 第 ${layer} 層太擠`)
+    signatures.add(layout.map((t) => `${t.role}@${t.layer}`).sort().join(','))
+    const s = newGame({ seed: 7, scenario })
+    assert.deepEqual(s.nodes.map((n) => n.id), ids, '開局照公司配置建立節點')
+  }
+  assert.equal(signatures.size, SCENARIO_IDS.length, '每間公司的配置都不一樣')
+})
+
+test('沒有 AI 的公司不會發 AI 牌；有兩個 AI 時要指定其中一個', () => {
+  assert.ok(!SCENARIOS.factory.layout.some((t) => t.kind === 'ai'))
+  for (let seed = 1; seed <= 20; seed++) {
+    const s = newGame({ seed, scenario: 'factory' })
+    const cards = [...s.hand, ...s.deck].map((c) => c.id)
+    for (const id of ['ally', 'inject', 'skill'] as const) assert.ok(!cards.includes(id), `工廠不該有「${CARDS[id].name}」`)
+  }
+  const s = companyWorld('startup')
+  weakness(s, 'ai', 'obey')
+  weakness(s, 'agent', 'obey')
+  assert.equal(predict(s, 'inject', 'ai'), 'Y')
+  assert.equal(predict(s, 'inject', 'agent'), 'N', '內網的 AI 代理要先開放內網')
+  assert.deepEqual(Object.keys(playability(s, 'inject').targets), ['ai'])
+  control(s, 'sales')
+  assert.equal(predict(s, 'inject', 'agent'), 'Y')
+  assert.deepEqual(play(s, 'inject', 'agent').effect.captured, ['agent'])
+  assert.equal(node(s, 'ai').controlled, false, '只控制指定的 AI')
+  // 任一 AI 有萬能鑰匙且受控，就能直達資料庫
+  const k = companyWorld('startup')
+  weakness(k, 'agent', 'masterkey')
+  control(k, 'agent')
+  assert.equal(reachKnown(k, node(k, 'db')), 'Y')
+  // 控制兩個 AI 也只有一次免費出牌
+  const f = companyWorld('startup')
+  control(f, 'ai')
+  control(f, 'agent')
+  startHackerTurn(f)
+  assert.equal(f.freePlayReady, true)
+  assert.equal(isFree(f, 'scan'), true)
+  play(f, 'scan')
+  assert.equal(isFree(f, 'scan'), false)
+})
+
+test('兩套基礎設施：入侵牌指定其中一個，任一受控即滿足「控制基礎設施」', () => {
+  const s = companyWorld('factory', 'sabotage')
+  control(s, 'sales')
+  assert.deepEqual(Object.keys(playability(s, 'usb').targets).sort(), ['infra', 'ot'])
+  assert.deepEqual(play(s, 'usb', 'ot').effect.captured, ['ot'])
+  assert.equal(node(s, 'infra').controlled, false, 'USB 只控制指定的基礎設施')
+  // 警報轟炸、破壞備份只要任一基礎設施
+  assert.equal(predict(s, 'alarm'), 'Y')
+  control(s, 'it')
+  assert.equal(predict(s, 'wipe'), 'Y')
+  // 系統破壞與病毒要指定已控制的那一個
+  assert.equal(predict(s, 'wreck', 'infra'), 'N')
+  assert.equal(predict(s, 'wreck', 'ot'), 'Y')
+  assert.equal(predict(s, 'virus', 'infra'), 'N')
+  assert.equal(predict(s, 'virus', 'ot'), 'Y')
+  assert.equal(play(s, 'virus', 'ot').effect.virus, true)
+  assert.equal(node(s, 'ot').virus, true)
+  assert.equal(node(s, 'infra').virus, false)
+  assert.equal(play(s, 'wreck', 'ot').win, true)
+})
+
+test('任一基礎設施的規則類弱點都對整間公司生效；中斷任何一套都暫停公司應變', () => {
+  const s = companyWorld('factory')
+  weakness(s, 'ot', 'nolog')
+  weakness(s, 'sales', 'weakpw')
+  assert.equal(play(s, 'brute', 'sales').noise, 2, '產線系統沒人看紀錄，噪音也減半')
+  const sea = companyWorld('factory')
+  weakness(sea, 'ot', 'openSea')
+  control(sea, 'sales')
+  assert.equal(reachKnown(sea, node(sea, 'db')), 'Y')
+  const remote = companyWorld('factory')
+  weakness(remote, 'ot', 'remote')
+  assert.equal(reachKnown(remote, node(remote, 'ot')), 'Y')
+  assert.equal(reachKnown(remote, node(remote, 'infra')), 'N', '遠端大門只開它所在的基礎設施')
+  const down = companyWorld('factory')
+  control(down, 'sales')
+  node(down, 'ot').paralyzed = 2
+  assert.equal(repairBlock(down), 'infraParalyzed')
+  assert.equal(recaptureBlock(down), 'infraParalyzed')
+  const steps = Array.from(endOfTurn(down))
+  assert.ok(steps.some((st) => st.t === 'frozen'))
+  assert.equal(node(down, 'ot').paralyzed, 1, '中斷依回合恢復')
+})
+
+test('兩個被感染的基礎設施各自回報一次弱點', () => {
+  const s = companyWorld('factory')
+  for (const id of ['sales', 'engineer', 'boss']) {
+    weakness(s, id, 'curious')
+    node(s, id).slots[0]!.vis = 0
+    delete node(s, id).slots[0]!.timer
+  }
+  for (const id of ['infra', 'ot']) {
+    control(s, id)
+    node(s, id).virus = true
+  }
+  const report = Array.from(endOfTurn(s)).find((st) => st.t === 'standing')
+  assert.ok(report && report.t === 'standing')
+  assert.equal(report.revealed.length, 2)
+  assert.deepEqual(report.from, ['infra', 'ot'])
+})
+
+test('董事長算主管級：可冒充轉帳、得手牌費用 −1，但不加行動點', () => {
+  const s = companyWorld('factory', 'bossfraud')
+  assert.equal(node(s, 'chairman').layer, 1)
+  weakness(s, 'engineer', 'gullible')
+  control(s, 'chairman')
+  control(s, 'ot')
+  assert.equal(apBonusOf(s), 0)
+  assert.equal(predict(s, 'bec', 'engineer'), 'Y')
+  assert.equal(predict(s, 'bec', 'chairman'), 'N', '不能騙主管級自己')
+  assert.equal(cardCost(s, 'bec'), 1)
+  assert.equal(cardCost(s, 'scan'), 1, '董事長只減得手牌')
+  assert.equal(play(s, 'bec', 'engineer').win, true)
+  const ransom = companyWorld('factory', 'ransom')
+  control(ransom, 'chairman')
+  assert.equal(cardCost(ransom, 'ransom'), 2)
 })

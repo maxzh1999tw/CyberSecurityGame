@@ -7,7 +7,6 @@ import {
   INFRA_PARALYZE_TURNS,
   MISSIONS,
   MISSION_IDS,
-  NODE_TEMPLATES,
   SCENARIOS,
   VULNS,
   ZONE_SPEED,
@@ -24,6 +23,7 @@ import type {
   GameNode,
   GameState,
   MissionId,
+  NodeTemplate,
   ScenarioId,
   Slot,
   Tri,
@@ -210,15 +210,31 @@ export function hiddenCount(s: GameState): number {
 // ───────────────────────── 控制狀態查詢 ─────────────────────────
 
 export const isEmployee = (n: GameNode) => n.kind === 'employee'
+export const isInfra = (n: GameNode) => n.role === 'infra'
+export const isAi = (n: GameNode) => n.kind === 'ai'
+/** 主管級：主管與董事長都能用來冒充老闆 */
+export const isExec = (n: GameNode) => n.role === 'boss' || n.role === 'chairman'
 const isCredentialTarget = (n: GameNode) =>
   isEmployee(n) || n.role === 'infra' || n.role === 'db' || n.role === 'backup'
 const isExploitTarget = (n: GameNode) =>
   isEmployee(n) || n.role === 'infra' || n.role === 'db' || n.role === 'backup'
+/** 公司裡所有基礎設施／AI（每間公司的數量不同，可能沒有 AI） */
+export const infras = (s: GameState) => s.nodes.filter(isInfra)
+export const ais = (s: GameState) => s.nodes.filter(isAi)
 export const ctrlCount = (s: GameState) => s.nodes.filter((n) => n.controlled).length
 const outerCtrl = (s: GameState) => s.nodes.some((n) => n.layer === 0 && n.controlled)
 const innerCtrl = (s: GameState) => s.nodes.some((n) => n.layer === 1 && n.controlled)
 const empCtrl = (s: GameState) => s.nodes.some((n) => isEmployee(n) && n.controlled)
 const nonItEmpCtrl = (s: GameState) => s.nodes.some((n) => isEmployee(n) && n.role !== 'it' && n.controlled)
+export const infraCtrl = (s: GameState) => infras(s).some((n) => n.controlled)
+export const aiCtrl = (s: GameState) => ais(s).some((n) => n.controlled)
+export const execCtrl = (s: GameState) => s.nodes.some((n) => isExec(n) && n.controlled)
+const roleCtrl = (s: GameState, role: GameNode['role']) => s.nodes.some((n) => n.role === role && n.controlled)
+/** IT 被控制或癱瘓，公司無法應變 */
+const itDown = (s: GameState) => {
+  const it = node(s, 'it')
+  return it.controlled || it.paralyzed > 0
+}
 
 /** 外圍可直接偵查；控制某層會開放下一層，且已控制的深層也可偵查同層。 */
 export function canRecon(s: GameState, n: GameNode): boolean {
@@ -269,15 +285,14 @@ function reach(s: GameState, H: Has, n: GameNode): Tri {
     return outer
   }
   const inner = yn(innerCtrl(s))
-  const infra = node(s, 'infra')
-  const sea = and(H(infra, 'openSea'), outer)
+  // 任一基礎設施有「自由海域」，外圍就能跳過內網
+  const sea = and(outer, or(...infras(s).map((i) => H(i, 'openSea'))))
   if (n.role === 'db') {
-    const ai = node(s, 'ai')
     return or(
       inner,
       sea,
       and(H(n, 'allaccess'), yn(empCtrl(s))),
-      and(yn(ai.controlled), H(ai, 'masterkey')),
+      ...ais(s).filter((a) => a.controlled).map((a) => H(a, 'masterkey')),
     )
   }
   return or(inner, sea)
@@ -290,13 +305,11 @@ export function reachKnown(s: GameState, n: GameNode): Tri {
 
 /** 指定目標前必須確認入口；未知捷徑不能繞過畫面上的鎖。 */
 function hasTargetAccess(s: GameState, id: CardId, t: GameNode | null): boolean {
-  // 員工可以是入口，但實際受影響的基礎設施同樣必須已開放。
-  if ((id === 'tail' || id === 'usb') && reachKnown(s, node(s, 'infra')) !== 'Y') return false
   return CARDS[id].targeting !== 'node' || (!!t && reachKnown(s, t) === 'Y')
 }
 
-/** 能接觸到的員工端，才能利用未鎖螢幕植入 USB 載荷。 */
-function usbSources(s: GameState): GameNode[] {
+/** 能接觸到的員工，才能利用未鎖螢幕植入 USB 載荷，或請他幫忙刷門禁。 */
+function contactSources(s: GameState): GameNode[] {
   return s.nodes.filter((n) => isEmployee(n) && reachKnown(s, n) === 'Y')
 }
 
@@ -313,17 +326,18 @@ function entriesOn(n: GameNode, vulns: VulnId[]): Entry[] {
 /** 實際走進這個節點時，用到的「規則類」弱點（成功時要一併翻開） */
 function reachUsed(s: GameState, n: GameNode): Entry[] {
   if (n.controlled) return []
-  if (n.layer === 1 && n.role === 'infra' && !outerCtrl(s) && effective(n, 'remote')) {
+  if (n.layer === 1 && isInfra(n) && !outerCtrl(s) && effective(n, 'remote')) {
     return [{ node: n.id, vuln: 'remote' }]
   }
   if (n.layer === 2 && !innerCtrl(s)) {
-    const infra = node(s, 'infra')
-    const db = node(s, 'db')
-    const ai = node(s, 'ai')
     const candidates: Entry[] = []
-    if (outerCtrl(s) && effective(infra, 'openSea')) candidates.push({ node: infra.id, vuln: 'openSea' })
-    if (n.role === 'db' && empCtrl(s) && effective(db, 'allaccess')) candidates.push({ node: db.id, vuln: 'allaccess' })
-    if (n.role === 'db' && ai.controlled && effective(ai, 'masterkey')) candidates.push({ node: ai.id, vuln: 'masterkey' })
+    if (outerCtrl(s)) {
+      for (const i of infras(s)) if (effective(i, 'openSea')) candidates.push({ node: i.id, vuln: 'openSea' })
+    }
+    if (n.role === 'db' && empCtrl(s) && effective(n, 'allaccess')) candidates.push({ node: n.id, vuln: 'allaccess' })
+    if (n.role === 'db') {
+      for (const a of ais(s)) if (a.controlled && effective(a, 'masterkey')) candidates.push({ node: a.id, vuln: 'masterkey' })
+    }
     const used = preferredEntry(s, candidates)
     if (used) return [used]
   }
@@ -334,16 +348,6 @@ function reachUsed(s: GameState, n: GameNode): Entry[] {
 
 function implicitTarget(s: GameState, id: CardId): GameNode | null {
   switch (id) {
-    case 'brute':
-    case 'usb':
-    case 'exploit':
-    case 'virus':
-    case 'wreck':
-      return node(s, 'infra')
-    case 'inject':
-    case 'skill':
-    case 'ally':
-      return node(s, 'ai')
     case 'ransom':
     case 'exfil':
       return node(s, 'db')
@@ -358,13 +362,11 @@ function implicitTarget(s: GameState, id: CardId): GameNode | null {
 
 /** 這張牌的條件在某個「視角」下成立嗎 */
 export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null): Tri {
-  const infra = node(s, 'infra')
-  const ai = node(s, 'ai')
   const db = node(s, 'db')
   const backup = node(s, 'backup')
   switch (id) {
     case 'ally':
-      return 'Y'
+      return t && isAi(t) && canRecon(s, t) ? 'Y' : 'N'
     case 'scan':
       return s.nodes.some((n) => canRecon(s, n) && !n.sealed && hiddenIdx(n).length > 0) ? 'Y' : 'N'
     case 'osint':
@@ -374,7 +376,7 @@ export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null):
         ? or(yn(empCtrl(s)), H(t, 'gullible'), H(t, 'oversharer'))
         : 'N'
     case 'virus':
-      return and(yn(infra.controlled), yn(empCtrl(s)))
+      return t && isInfra(t) ? and(yn(t.controlled), yn(empCtrl(s))) : 'N'
     case 'phish':
       return t ? and(reach(s, H, t), H(t, 'curious')) : 'N'
     case 'social':
@@ -382,7 +384,7 @@ export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null):
     case 'cred':
       return t ? and(reach(s, H, t), H(t, 'samepw')) : 'N'
     case 'tail':
-      return t && isEmployee(t) ? and(reach(s, H, t), reach(s, H, infra), H(t, 'kind')) : 'N'
+      return t && isInfra(t) ? and(reach(s, H, t), or(...contactSources(s).map((n) => H(n, 'kind')))) : 'N'
     case 'mfa':
       return t ? and(reach(s, H, t), H(t, 'approver')) : 'N'
     case 'brute':
@@ -390,17 +392,19 @@ export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null):
     case 'exploit':
       return t ? and(reach(s, H, t), or(H(t, 'buggy'), H(t, 'legacy'))) : 'N'
     case 'inject':
-      return or(yn(node(s, 'it').controlled), H(ai, 'obey'), H(ai, 'nohuman'))
+      return t && isAi(t) ? and(reach(s, H, t), or(yn(node(s, 'it').controlled), H(t, 'obey'), H(t, 'nohuman'))) : 'N'
     case 'skill':
-      return or(yn(empCtrl(s)), H(ai, 'selfupd'))
+      return t && isAi(t) ? and(reach(s, H, t), or(yn(empCtrl(s)), H(t, 'selfupd'))) : 'N'
     case 'usb':
-      return and(reach(s, H, infra), or(yn(empCtrl(s)), ...usbSources(s).map((n) => H(n, 'lazy'))))
+      return t && isInfra(t)
+        ? and(reach(s, H, t), or(yn(empCtrl(s)), ...contactSources(s).map((n) => H(n, 'lazy'))))
+        : 'N'
     case 'lateral':
       return t && lateralCandidates(s, t).length > 0 ? 'Y' : 'N'
     case 'alarm':
-      return and(yn(infra.controlled), yn(nonItEmpCtrl(s)))
+      return and(yn(infraCtrl(s)), yn(nonItEmpCtrl(s)))
     case 'wipe':
-      return and(yn(infra.controlled), yn(node(s, 'it').controlled || db.controlled))
+      return and(yn(infraCtrl(s)), yn(node(s, 'it').controlled || db.controlled))
     case 'ransom':
       return and(
         yn(db.controlled),
@@ -408,16 +412,14 @@ export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null):
       )
     case 'bec':
       return t
-        ? and(yn(node(s, 'boss').controlled), yn(infra.controlled), H(t, 'gullible'))
+        ? and(yn(execCtrl(s)), yn(infraCtrl(s)), H(t, 'gullible'))
         : 'N'
     case 'exfil':
       return s.mission === 'insiderleak'
         ? and(yn(empCtrl(s)), yn(db.controlled))
         : 'N'
-    case 'wreck': {
-      const it = node(s, 'it')
-      return and(yn(infra.controlled), yn(it.controlled || it.paralyzed > 0))
-    }
+    case 'wreck':
+      return t && isInfra(t) ? and(yn(t.controlled), yn(itDown(s))) : 'N'
     // 資源管理牌：沒有「需要哪個弱點」的條件，能不能打看 legal
     case 'wipelog':
     case 'proxy':
@@ -430,7 +432,6 @@ export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null):
 
 /** 條件裡「弱點存不存在」這一類的檢查點（失敗時用來推論「確定不存在」） */
 function tested(s: GameState, id: CardId, t: GameNode | null): Array<[GameNode, VulnId]> {
-  const ai = node(s, 'ai')
   const backup = node(s, 'backup')
   switch (id) {
     case 'smooth':
@@ -444,9 +445,9 @@ function tested(s: GameState, id: CardId, t: GameNode | null): Array<[GameNode, 
     case 'cred':
       return t ? [[t, 'samepw']] : []
     case 'tail':
-      return t ? [[t, 'kind']] : []
+      return contactSources(s).map((n) => [n, 'kind'])
     case 'usb':
-      return empCtrl(s) ? [] : usbSources(s).map((n) => [n, 'lazy'])
+      return empCtrl(s) ? [] : contactSources(s).map((n) => [n, 'lazy'])
     case 'mfa':
       return t ? [[t, 'approver']] : []
     case 'brute':
@@ -454,18 +455,20 @@ function tested(s: GameState, id: CardId, t: GameNode | null): Array<[GameNode, 
         ? [
             [t, 'weakpw'],
             ...(isEmployee(t) ? [[t, 'samepw'] as [GameNode, VulnId]] : []),
-            ...(t.role === 'infra' ? [[t, 'remote'] as [GameNode, VulnId]] : []),
+            ...(isInfra(t) ? [[t, 'remote'] as [GameNode, VulnId]] : []),
           ]
         : []
     case 'exploit':
       return t ? [[t, 'buggy'], [t, 'legacy']] : []
     case 'inject':
-      return [
-        [ai, 'obey'],
-        [ai, 'nohuman'],
-      ]
+      return t
+        ? [
+            [t, 'obey'],
+            [t, 'nohuman'],
+          ]
+        : []
     case 'skill':
-      return [[ai, 'selfupd']]
+      return t ? [[t, 'selfupd']] : []
     case 'ransom':
       return [[backup, 'nobackup']]
     default:
@@ -476,9 +479,7 @@ function tested(s: GameState, id: CardId, t: GameNode | null): Array<[GameNode, 
 /** 卡牌在公開規則上的合法性（跟駭客知道多少無關） */
 function legal(s: GameState, id: CardId, t: GameNode | null): boolean {
   if (!hasTargetAccess(s, id, t)) return false
-  const infra = node(s, 'infra')
   const db = node(s, 'db')
-  const ai = node(s, 'ai')
   switch (id) {
     case 'scan':
       return s.nodes.some((n) => canRecon(s, n) && !n.sealed && hiddenIdx(n).length > 0)
@@ -487,28 +488,28 @@ function legal(s: GameState, id: CardId, t: GameNode | null): boolean {
     case 'smooth':
       return !!t && isEmployee(t) && canRecon(s, t) && !t.sealed && hiddenIdx(t).length > 0
     case 'ally':
-      return !ai.sealed && hiddenIdx(ai).length > 0
+      return !!t && isAi(t) && canRecon(s, t) && !t.sealed && hiddenIdx(t).length > 0
     case 'virus':
-      return infra.controlled && !infra.virus
+      return !!t && isInfra(t) && t.controlled && !t.virus
     case 'phish':
     case 'social':
     case 'cred':
-    case 'tail':
     case 'mfa':
       return !!t && isEmployee(t)
     case 'bec':
-      return !!t && isEmployee(t) && t.role !== 'boss' && infra.controlled
+      return !!t && isEmployee(t) && !isExec(t) && infraCtrl(s)
     case 'brute':
       return !!t && isCredentialTarget(t)
     case 'exploit':
       return !!t && isExploitTarget(t)
     case 'lateral':
       return !!t && lateralCandidates(s, t).length > 0
+    case 'tail':
     case 'usb':
-      return true
+      return !!t && isInfra(t)
     case 'inject':
     case 'skill':
-      return true
+      return !!t && isAi(t)
     case 'alarm':
       // 還在癱瘓中也可以再打一次，把時間延長
       return node(s, 'it').paralyzed <= IT_PARALYZE_TURNS - 1
@@ -519,7 +520,7 @@ function legal(s: GameState, id: CardId, t: GameNode | null): boolean {
     case 'exfil':
       return s.mission === 'insiderleak' && empCtrl(s) && db.controlled
     case 'wreck':
-      return infra.controlled
+      return !!t && isInfra(t) && t.controlled
     case 'wipelog':
     case 'proxy':
       return s.alert >= 1
@@ -548,16 +549,17 @@ export interface Playability {
   autoTri: Tri
 }
 
-/** 套用主管的權限核准折扣後、尚未套用 AI 免費出牌前的費用。 */
+/** 套用主管、董事長的權限核准折扣後、尚未套用 AI 免費出牌前的費用。 */
 function beforeFree(s: GameState, id: CardId): number {
   const def = CARDS[id]
   let cost = def.cost
-  if (cost > 0 && def.stage === '擴散' && node(s, 'boss').controlled) cost = Math.max(1, cost - 1)
+  if (cost > 0 && def.stage === '擴散' && roleCtrl(s, 'boss')) cost = Math.max(1, cost - 1)
+  if (cost > 0 && def.stage === '得手' && roleCtrl(s, 'chairman')) cost = Math.max(1, cost - 1)
   return cost
 }
 
 export function isFree(s: GameState, id: CardId): boolean {
-  return s.freePlayReady && node(s, 'ai').controlled && beforeFree(s, id) === 1
+  return s.freePlayReady && aiCtrl(s) && beforeFree(s, id) === 1
 }
 
 /** 實際費用；對已知是「社群分享狂」的員工用肉搜情報，費用 -1 */
@@ -574,12 +576,18 @@ const NODE_TARGET_POOL: Partial<Record<CardId, (n: GameNode) => boolean>> = {
   phish: isEmployee,
   social: isEmployee,
   cred: isEmployee,
-  tail: isEmployee,
   mfa: isEmployee,
   bec: isEmployee,
   brute: isCredentialTarget,
   exploit: isExploitTarget,
   lateral: (n) => n.controlled,
+  tail: isInfra,
+  usb: isInfra,
+  virus: isInfra,
+  wreck: isInfra,
+  ally: isAi,
+  inject: isAi,
+  skill: isAi,
 }
 
 /** 駭客視角的預測 */
@@ -596,8 +604,6 @@ export function hintNodes(s: GameState, id: CardId): string[] {
     case 'osint':
     case 'smooth':
       return s.nodes.filter((n) => predict(s, id, n.id) !== 'N').map((n) => n.id)
-    case 'usb':
-      return ['infra']
     case 'ransom':
       return ['db', 'backup']
     case 'exfil':
@@ -606,8 +612,6 @@ export function hintNodes(s: GameState, id: CardId): string[] {
       return s.nodes
         .filter((n) => n.controlled && lateralCandidates(s, n).length > 0)
         .map((n) => n.id)
-    case 'wreck':
-      return ['infra', 'it']
     default: {
       const t = implicitTarget(s, id)
       return t ? [t.id] : []
@@ -698,7 +702,6 @@ function capture(
 }
 
 function entryFor(s: GameState, id: CardId, t: GameNode | null): Entry | null {
-  const ai = node(s, 'ai')
   switch (id) {
     case 'phish':
       return t ? { node: t.id, vuln: 'curious' } : null
@@ -709,18 +712,18 @@ function entryFor(s: GameState, id: CardId, t: GameNode | null): Entry | null {
     case 'mfa':
       return t ? { node: t.id, vuln: 'approver' } : null
     case 'tail':
-      return t ? { node: t.id, vuln: 'kind' } : null
+      return preferredEntry(s, contactSources(s).flatMap((n) => entriesOn(n, ['kind'])))
     case 'usb':
-      return empCtrl(s) ? null : preferredEntry(s, usbSources(s).flatMap((n) => entriesOn(n, ['lazy'])))
+      return empCtrl(s) ? null : preferredEntry(s, contactSources(s).flatMap((n) => entriesOn(n, ['lazy'])))
     case 'brute':
       return t ? preferredEntry(s, entriesOn(t, ['weakpw', 'samepw'])) : null
     case 'exploit':
       return t ? preferredEntry(s, entriesOn(t, ['buggy', 'legacy'])) : null
     case 'inject':
-      if (node(s, 'it').controlled) return null
-      return preferredEntry(s, entriesOn(ai, ['obey', 'nohuman']))
+      if (!t || node(s, 'it').controlled) return null
+      return preferredEntry(s, entriesOn(t, ['obey', 'nohuman']))
     case 'skill':
-      return empCtrl(s) ? null : { node: ai.id, vuln: 'selfupd' }
+      return !t || empCtrl(s) ? null : { node: t.id, vuln: 'selfupd' }
     default:
       return null
   }
@@ -771,8 +774,6 @@ export function resolve(s: GameState, id: CardId, t: GameNode | null): Effect {
   }
   // 直接呼叫結算也不能透過失敗推論或揭露，探查尚未開放的目標。
   if (!hasTargetAccess(s, id, t)) return eff
-  const infra = node(s, 'infra')
-  const ai = node(s, 'ai')
   const db = node(s, 'db')
   const backup = node(s, 'backup')
   const ok = condition(s, trueHas, id, t) === 'Y'
@@ -805,17 +806,19 @@ export function resolve(s: GameState, id: CardId, t: GameNode | null): Effect {
         break
       }
       case 'ally': {
-        const bonus = effective(ai, 'selfupd') || effective(ai, 'obey')
-        const r = revealRandomOn(s, ai, bonus ? 2 : 1)
+        if (!t) break
+        const bonus = effective(t, 'selfupd') || effective(t, 'obey')
+        const r = revealRandomOn(s, t, bonus ? 2 : 1)
         eff.revealed.push(...r.refs)
         if (r.dry) {
-          ai.sealed = true
-          eff.dry.push(ai.id)
+          t.sealed = true
+          eff.dry.push(t.id)
         }
         break
       }
       case 'virus':
-        infra.virus = true
+        if (!t) break
+        t.virus = true
         eff.virus = true
         break
       case 'phish':
@@ -829,14 +832,15 @@ export function resolve(s: GameState, id: CardId, t: GameNode | null): Effect {
         }
         break
       case 'tail': {
+        if (!t) break
         eff.entry = entryFor(s, id, t)
-        const used = reachUsed(s, infra)
+        const used = reachUsed(s, t)
         if (rnd(s) < 0.5) {
-          capture(s, infra, eff.entry, eff.revealed, used, eff.extended)
-          eff.captured.push(infra.id)
+          capture(s, t, eff.entry, eff.revealed, used, eff.extended)
+          eff.captured.push(t.id)
         } else {
-          infra.paralyzed = Math.max(infra.paralyzed, INFRA_PARALYZE_TURNS)
-          eff.paralyzed = infra.id
+          t.paralyzed = Math.max(t.paralyzed, INFRA_PARALYZE_TURNS)
+          eff.paralyzed = t.id
           revealEntries(s, eff.entry ? [eff.entry, ...used] : used, eff.revealed)
         }
         break
@@ -852,14 +856,16 @@ export function resolve(s: GameState, id: CardId, t: GameNode | null): Effect {
       }
       case 'inject':
       case 'skill':
-        eff.entry = entryFor(s, id, ai)
-        capture(s, ai, eff.entry, eff.revealed, [], eff.extended)
-        eff.captured.push(ai.id)
+        if (!t) break
+        eff.entry = entryFor(s, id, t)
+        capture(s, t, eff.entry, eff.revealed, reachUsed(s, t), eff.extended)
+        eff.captured.push(t.id)
         break
       case 'usb':
+        if (!t) break
         eff.entry = entryFor(s, id, t)
-        capture(s, infra, eff.entry, eff.revealed, reachUsed(s, infra), eff.extended)
-        eff.captured.push(infra.id)
+        capture(s, t, eff.entry, eff.revealed, reachUsed(s, t), eff.extended)
+        eff.captured.push(t.id)
         break
       case 'lateral': {
         if (!t) break
@@ -1040,8 +1046,13 @@ export function recycleCard(s: GameState, uid: number): CardInst | null {
   return fresh
 }
 
+/** 任一基礎設施「沒人看紀錄」，整間公司都聽不太到噪音 */
+export function noLogs(s: GameState, H: Has = trueHas): Tri {
+  return or(...infras(s).map((i) => H(i, 'nolog')))
+}
+
 export function noiseOf(s: GameState, base: number): number {
-  return effective(node(s, 'infra'), 'nolog') ? Math.ceil(base / 2) : base
+  return noLogs(s) === 'Y' ? Math.ceil(base / 2) : base
 }
 
 function isFinisherOfMission(s: GameState, id: CardId): boolean {
@@ -1102,7 +1113,7 @@ export function drawCards(s: GameState, n: number): CardInst[] {
 }
 
 export function apBonusOf(s: GameState): number {
-  return s.nodes.filter((n) => isEmployee(n) && n.role !== 'it' && n.role !== 'boss' && n.controlled).length
+  return s.nodes.filter((n) => isEmployee(n) && n.role !== 'it' && !isExec(n) && n.controlled).length
 }
 
 export function startHackerTurn(s: GameState): CardInst[] {
@@ -1116,7 +1127,7 @@ export function startHackerTurn(s: GameState): CardInst[] {
   s.carryBoost = 0
   s.ap = s.apBase + s.apBonus + s.apCarry
   s.noiseThisTurn = 0
-  s.freePlayReady = node(s, 'ai').controlled
+  s.freePlayReady = aiCtrl(s)
   s.phase = 'hacker'
   // 任務牌已先放進手中，開局只補到 6 張；備份在之後每回合多補 1 張。
   const backup = node(s, 'backup')
@@ -1136,16 +1147,18 @@ export function startHackerTurn(s: GameState): CardInst[] {
 
 export type BlockReason = 'itControlled' | 'itParalyzed' | 'infraParalyzed' | null
 
+const infraDown = (s: GameState) => infras(s).some((n) => n.paralyzed > 0)
+
 export function repairBlock(s: GameState): BlockReason {
   const it = node(s, 'it')
   if (it.paralyzed > 0) return 'itParalyzed'
-  if (node(s, 'infra').paralyzed > 0) return 'infraParalyzed'
+  if (infraDown(s)) return 'infraParalyzed'
   if (it.controlled) return 'itControlled'
   return null
 }
 export function recaptureBlock(s: GameState): BlockReason {
   if (node(s, 'it').paralyzed > 0) return 'itParalyzed'
-  return node(s, 'infra').paralyzed > 0 ? 'infraParalyzed' : null
+  return infraDown(s) ? 'infraParalyzed' : null
 }
 
 export interface Upcoming {
@@ -1212,6 +1225,8 @@ export interface FrozenStep {
 export interface StandingStep {
   t: 'standing'
   revealed: SlotRef[]
+  /** 每個揭露各是哪個被感染的基礎設施回報的（與 revealed 對齊） */
+  from: string[]
 }
 export interface CooldownStep {
   t: 'cooldown'
@@ -1311,15 +1326,21 @@ export function* endOfTurn(s: GameState): Generator<StepOutcome, void, void> {
     }
   }
 
-  // 常駐效果：賽博病毒
-  const infra = node(s, 'infra')
+  // 常駐效果：賽博病毒（每個被感染的基礎設施各回報一次）
   const revealed: SlotRef[] = []
-  if (infra.controlled && infra.virus && infra.paralyzed === 0) revealed.push(...revealRandomAnywhere(s).refs)
-  yield { t: 'standing', revealed }
+  const from: string[] = []
+  for (const infra of infras(s)) {
+    if (!infra.controlled || !infra.virus || infra.paralyzed > 0) continue
+    for (const ref of revealRandomAnywhere(s).refs) {
+      revealed.push(ref)
+      from.push(infra.id)
+    }
+  }
+  yield { t: 'standing', revealed, from }
 
   // IT 與基礎設施的中斷固定按回合恢復，不受暫停修復影響。
   if (it.paralyzed > 0) it.paralyzed -= 1
-  if (infra.paralyzed > 0) infra.paralyzed -= 1
+  for (const infra of infras(s)) if (infra.paralyzed > 0) infra.paralyzed -= 1
 
   // 冷卻
   let delta = 0
@@ -1357,13 +1378,14 @@ export function endTurn(s: GameState): void {
 
 // ───────────────────────── 開局 ─────────────────────────
 
-function newNode(id: string, name: string, role: GameNode['role'], kind: GameNode['kind'], layer: GameNode['layer'], slots: Slot[]): GameNode {
+function newNode(t: NodeTemplate, slots: Slot[]): GameNode {
   return {
-    id,
-    name,
-    role,
-    kind,
-    layer,
+    id: t.id,
+    name: t.name,
+    role: t.role,
+    kind: t.kind,
+    layer: t.layer,
+    ...(t.art ? { art: t.art } : {}),
     slots,
     controlled: false,
     controlSeq: 0,
@@ -1449,14 +1471,13 @@ function idealClosure(s0: GameState, includeLateral = true): GameState {
       for (const t of targets) {
         // 可達性閉包只模擬新增控制，不模擬續控的計時延長；否則重複攻擊會
         // 改寫入口或延長 timer，卻不會增加任務可達節點。
-        if (t?.controlled && id !== 'tail' && id !== 'lateral' && id !== 'alarm' && id !== 'wipe') continue
+        if (t?.controlled && id !== 'lateral' && id !== 'alarm' && id !== 'wipe') continue
         if (!legal(s, id, t)) continue
         if (condition(s, trueHas, id, t) !== 'Y') continue
         if (id === 'tail') {
           // 理想路線取兩種隨機結果中可新增控制的分支，避免亂數誤判無解。
-          const infra = node(s, 'infra')
-          if (!infra.controlled) {
-            capture(s, infra, entryFor(s, id, t), [], reachUsed(s, infra))
+          if (t && !t.controlled) {
+            capture(s, t, entryFor(s, id, t), [], reachUsed(s, t))
             changed = true
           }
           continue
@@ -1494,8 +1515,10 @@ export function uselessCards(s0: GameState): CardId[] {
   const beforeLateral = idealClosure(initialWorld(s0), false)
   const usable = (id: CardId): boolean => {
     // 偵查牌（掃描、肉搜、盟友）與這局的得手牌，沒有「缺哪個弱點」的問題
-    if (id === 'scan' || id === 'osint' || id === 'ally' || CARDS[id].cat === 'finish' || CARDS[id].cat === 'support') return true
-    if (id === 'virus') return condition(c, trueHas, id, null) === 'Y'
+    if (id === 'scan' || id === 'osint' || CARDS[id].cat === 'finish' || CARDS[id].cat === 'support') return true
+    // 沒有 AI 的公司，用不到任何 AI 牌
+    if (id === 'ally') return ais(c).length > 0
+    if (id === 'virus') return infras(c).some((t) => condition(c, trueHas, id, t) === 'Y')
     if (id === 'smooth') {
       // 穩定前置是已控制員工；否則只保留有可用目標弱點的牌。
       // 不受模擬翻牌、玩家偵查進度或節點封存狀態影響。
@@ -1526,7 +1549,6 @@ export function uselessCards(s0: GameState): CardId[] {
 
 export function routeExists(s: GameState): boolean {
   const c = idealClosure(s)
-  const boss = node(c, 'boss')
   switch (s.mission) {
     case 'ransom':
       return condition(c, trueHas, 'ransom', null) === 'Y'
@@ -1534,17 +1556,14 @@ export function routeExists(s: GameState): boolean {
       return dbAccess(c)
     case 'bossfraud':
       return (
-        boss.controlled &&
-        node(c, 'infra').controlled &&
-        c.nodes.some((e) => isEmployee(e) && e.id !== 'boss' && effective(e, 'gullible'))
+        execCtrl(c) &&
+        infraCtrl(c) &&
+        c.nodes.some((e) => isEmployee(e) && !isExec(e) && effective(e, 'gullible'))
       )
     case 'insiderleak':
       return condition(c, trueHas, 'exfil', null) === 'Y'
-    case 'sabotage': {
-      const infra = node(c, 'infra')
-      const it = node(c, 'it')
-      return infra.controlled && (it.controlled || it.paralyzed > 0)
-    }
+    case 'sabotage':
+      return infraCtrl(c) && itDown(c)
   }
 }
 
@@ -1676,14 +1695,15 @@ export function newGame(opts: NewGameOptions = {}): GameState {
     noiseTotal: 0,
   }
   s.mission = opts.mission ?? pick(s, MISSION_IDS)
-  for (const t of NODE_TEMPLATES) {
-    s.nodes.push(newNode(t.id, t.name, t.role, t.kind, t.layer, drawSlots(s, s.scenario, t.kind, t.role, t.draw)))
+  const layout = SCENARIOS[s.scenario].layout
+  for (const t of layout) {
+    s.nodes.push(newNode(t, drawSlots(s, s.scenario, t.kind, t.role, t.draw)))
   }
   ensureSolvable(s)
   // 還是無解（例如「假老闆詐騙」需要同時湊齊兩個條件）：整副重抽
   for (let a = 0; a < 40 && !routeExists(s); a++) {
     for (const n of s.nodes) {
-      const t = NODE_TEMPLATES.find((x) => x.id === n.id)!
+      const t = layout.find((x) => x.id === n.id)!
       n.slots = drawSlots(s, s.scenario, t.kind, t.role, t.draw)
     }
     ensureSolvable(s)

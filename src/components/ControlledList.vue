@@ -22,6 +22,7 @@ const ABILITY: Record<string, { icon: string; text: string }> = {
   sales: { icon: 'zap', text: '+1 行動點' },
   engineer: { icon: 'zap', text: '+1 行動點' },
   boss: { icon: 'crown', text: '擴散 −1 行動點' },
+  chairman: { icon: 'hand-coins', text: '得手 −1 行動點' },
   it: { icon: 'wrench', text: '修復暫停' },
   infra: { icon: 'bug', text: '病毒' },
   ai: { icon: 'sparkles', text: '每回合免費 1 張' },
@@ -41,7 +42,7 @@ function look(id: string) {
     <div class="tag">我控制的節點<b>{{ mine.length }}</b></div>
     <div class="list">
       <div v-for="m in mine" :key="m.n.id" class="row" @pointerenter="look(m.n.id)" @pointerleave="ui.hoverNode === m.n.id && (ui.hoverNode = null)">
-        <div class="av"><NodeArt :role="m.n.role" /></div>
+        <div class="av"><NodeArt :art="m.n.art ?? m.n.role" /></div>
         <div class="tx">
           <b>{{ m.n.name }}</b>
           <span v-if="ABILITY[m.n.role].text || m.n.role === 'backup'"><Icon :name="ABILITY[m.n.role].icon" :size="14" :stroke="2.4" /><template v-if="m.n.role !== 'backup' || m.n.paralyzed <= 0">{{ ABILITY[m.n.role].text }}</template></span>

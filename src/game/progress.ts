@@ -1,6 +1,6 @@
 // 任務進度（給畫面顯示用）
 import { MISSIONS } from './data'
-import { isEmployee, knownHas, node } from './engine'
+import { execCtrl, infraCtrl, isEmployee, isExec, knownHas, node } from './engine'
 import type { GameState } from './types'
 
 export interface Goal {
@@ -14,8 +14,6 @@ export interface Goal {
 export function missionGoals(s: GameState): Goal[] {
   const db = node(s, 'db')
   const backup = node(s, 'backup')
-  const boss = node(s, 'boss')
-  const infra = node(s, 'infra')
   switch (s.mission) {
     case 'ransom': {
       const nb = knownHas(backup, 'nobackup')
@@ -39,10 +37,10 @@ export function missionGoals(s: GameState): Goal[] {
       ]
     }
     case 'bossfraud': {
-      const known = s.nodes.some((n) => isEmployee(n) && n.id !== 'boss' && knownHas(n, 'gullible') === 'Y')
+      const known = s.nodes.some((n) => isEmployee(n) && !isExec(n) && knownHas(n, 'gullible') === 'Y')
       return [
-        { icon: 'user-round', label: '控制主管', done: boss.controlled },
-        { icon: 'server', label: '控制基礎設施', done: infra.controlled },
+        { icon: 'user-round', label: '控制主管級', done: execCtrl(s) },
+        { icon: 'server', label: '控制基礎設施', done: infraCtrl(s) },
         { icon: 'handshake', label: '找到好騙的人', done: known },
         { icon: 'banknote', label: '假冒轉帳', done: false },
       ]
@@ -56,10 +54,9 @@ export function missionGoals(s: GameState): Goal[] {
       ]
     }
     case 'sabotage': {
-      const infra = node(s, 'infra')
       const it = node(s, 'it')
       return [
-        { icon: 'server', label: '控制基礎設施', done: infra.controlled },
+        { icon: 'server', label: '控制基礎設施', done: infraCtrl(s) },
         { icon: 'siren', label: 'IT 無法應變', done: it.controlled || it.paralyzed !== 0 },
         { icon: 'server-crash', label: '系統破壞', done: false },
       ]
