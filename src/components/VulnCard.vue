@@ -154,7 +154,7 @@ const local = ref(false)
 .desc {
   margin-top: 6px;
   padding: 0 16px;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   line-height: 1.5;
   text-align: center;
@@ -164,7 +164,7 @@ const local = ref(false)
   margin: 8px 14px 0;
   padding: 3px 10px;
   border-radius: 6px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   line-height: 1.4;
   background: #efd9a0;
@@ -178,7 +178,7 @@ const local = ref(false)
 .tags span {
   padding: 1px 10px;
   border-radius: 6px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 900;
   color: #fff;
 }
@@ -196,25 +196,25 @@ const local = ref(false)
   align-items: center;
   gap: 5px;
   margin-bottom: 10px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--ink2);
 }
 .back .band {
   background: #1f7a62;
-  font-size: 18px;
+  font-size: 20px;
 }
 .sec {
   padding: 10px 14px 0;
 }
 .sec b {
-  font-size: 15px;
+  font-size: 17px;
   letter-spacing: 3px;
   color: #1f7a62;
 }
 .sec p {
   margin: 3px 0 0;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1.5;
 }
@@ -234,13 +234,13 @@ const local = ref(false)
   gap: 8px;
   padding: 7px 10px;
   border-radius: 8px;
-  font-size: 14.5px;
+  font-size: 17px;
   line-height: 1.4;
   color: #fff;
   background: #3a4862;
 }
 .case b {
-  font-size: 15px;
+  font-size: 17px;
   color: var(--gold2);
 }
 .case p {

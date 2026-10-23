@@ -212,8 +212,8 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
   display: flex;
   gap: 7px;
   align-items: flex-start;
-  font-size: 16px;
-  line-height: 1.42;
+  font-size: 17px;
+  line-height: 1.4;
   font-weight: 700;
 }
 .lab {
@@ -221,7 +221,7 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
   margin-top: 2px;
   padding: 0 6px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
   letter-spacing: 1px;
   line-height: 1.55;

@@ -154,7 +154,7 @@ const zcls = (i: number) => (i >= 10 ? 'z3' : i >= 7 ? 'z2' : i >= 4 ? 'z1' : 'z
 .marks {
   position: relative;
   height: 20px;
-  font-size: 14.5px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text2);
 }

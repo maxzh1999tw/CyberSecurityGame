@@ -180,6 +180,238 @@ svg {
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .05 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>");
 }
 
+/* ───────── 公司模式：專業的辦公室 ─────────
+   沿用同一套卡牌與插圖，只把桌面換成辦公室：霧面藍灰的桌面與平面圖格線、
+   米白偏灰的面板（不用純白，避免刺眼），藍色作為主色，金色留給重點。 */
+.office {
+  --table0: #b9c4d2;
+  --table1: #c7d1dd;
+  --table2: #b2bdcb;
+  --slate: #e6eaf0;
+  --slate2: #d9dfe7;
+  --edge: #c3ccd8;
+  --edge2: #a3b0c2;
+  --text: #1c2738;
+  --text2: #44536a;
+  --text3: #6d7a8e;
+  /* 淺底上要用深一點的綠與紅才看得清楚 */
+  --good2: #1d8a55;
+  --bad2: #b8392a;
+  --o-blue: #2a5fb0;
+  --o-blue2: #5683c9;
+  --o-navy: #1d3557;
+  --o-shadow: 0 6px 16px rgba(20, 35, 60, 0.16);
+  color: var(--text);
+}
+.office.felt {
+  background-color: var(--table1);
+  background-image:
+    radial-gradient(ellipse 90% 80% at 50% 40%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(ellipse 120% 95% at 50% 45%, rgba(0, 0, 0, 0) 60%, rgba(20, 35, 60, 0.22) 100%),
+    linear-gradient(rgba(29, 53, 87, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(29, 53, 87, 0.06) 1px, transparent 1px);
+  background-size: auto, auto, 40px 40px, 40px 40px;
+}
+
+/* 公司模式的遊戲畫面：元件沿用駭客模式，只換掉寫死的深色 */
+.game.office .rail {
+  background: color-mix(in srgb, var(--slate) 88%, transparent);
+  border-color: var(--edge);
+  box-shadow: 0 0 24px rgba(30, 50, 80, 0.08);
+}
+.game.office .board .row {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--lc) 12%, transparent), transparent 24%),
+    color-mix(in srgb, var(--slate) 70%, transparent);
+  border-color: color-mix(in srgb, var(--lc) 32%, #fff);
+  box-shadow:
+    inset 0 3px 10px rgba(30, 50, 80, 0.07),
+    0 2px 6px rgba(30, 50, 80, 0.06);
+}
+.game.office .board .label {
+  color: color-mix(in srgb, var(--lc) 75%, #0b1426);
+  text-shadow: none;
+}
+.game.office .board .gate {
+  background: var(--slate);
+}
+.game.office .node {
+  border-color: color-mix(in srgb, var(--kc) 60%, #fff);
+  box-shadow: 0 6px 14px rgba(30, 50, 80, 0.16);
+}
+/* 被駭客控制：在公司這邊是警報，用紅色而不是駭客的「控制成功」綠色 */
+.game.office .node.ctrl {
+  --kd: #8f2f24;
+  border-color: #d4503f;
+  background: linear-gradient(180deg, #fff1ef, #fde3df 60%, #fbd5cf);
+  box-shadow:
+    0 0 0 3px rgba(212, 80, 63, 0.45),
+    0 0 22px rgba(212, 80, 63, 0.3),
+    0 6px 14px rgba(30, 50, 80, 0.16);
+}
+.game.office .node.ctrl .head {
+  background: linear-gradient(180deg, #d4503f, #9c3328);
+}
+.game.office .node.ctrl .avatar {
+  box-shadow:
+    0 0 0 3px #ff9a8c,
+    0 3px 6px rgba(0, 0, 0, 0.3);
+}
+.game.office .node .st-hidden {
+  background: #dfe5ec;
+  box-shadow: inset 0 0 0 1.5px #c3ccd8;
+}
+.game.office .node .st-hidden .q {
+  color: #9aa7ba;
+}
+/* 警戒條：淺色底上的格子與數字要換深色 */
+.game.office .alert {
+  border-color: #b3c0d3;
+  box-shadow: var(--o-shadow);
+}
+.game.office .alert .seg {
+  color: #8592a8;
+  background: #dfe5ec;
+  border-color: #c3ccd8;
+}
+.game.office .alert .seg.on {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.game.office .alert .num {
+  color: var(--o-navy);
+}
+.game.office .alert .cool:not(.lit) {
+  color: #6d7a8e;
+  background: #dfe5ec;
+  border-color: #a3b0c2;
+}
+
+/* 公司模式的節點：沿用同一張節點卡，標題列換成明亮的種類色、白色頭像框 */
+.game.office {
+  --k-employee: #c9772b;
+  --k-infra: #3a6fb5;
+  --k-ai: #7b5cc4;
+  --k-data: #1f8f86;
+}
+.game.office .node:not(.ctrl) {
+  --kd: color-mix(in srgb, var(--kc) 72%, #0b1426);
+  background: linear-gradient(180deg, #f5f7fa, #e9edf2);
+}
+.game.office .node:not(.ctrl) .head {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--kc) 86%, #fff), var(--kc) 70%, color-mix(in srgb, var(--kc) 88%, #0b1426));
+  border-bottom-color: color-mix(in srgb, var(--kc) 55%, #0b1426);
+}
+.game.office .node .avatar {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 3px 6px rgba(20, 35, 60, 0.35);
+}
+.game.office .node .econ {
+  background: #fff;
+  border-color: #c3ccd8;
+  box-shadow: 0 2px 6px rgba(20, 35, 60, 0.18);
+}
+.game.office .node .econ .c {
+  color: #c2412f;
+}
+
+/* 公司模式：被控制節點頭像上的骷髏徽章是紅色警報 */
+.game.office .node .hack {
+  background: #c8402f;
+  border-color: #ffd0c8;
+}
+/* 公司模式的層級防線：守住是綠色；駭客已經能打進來是紅色警告 */
+.game.office .fw {
+  color: #1d6e47;
+  --fc: #2c8f66;
+}
+.game.office .fw.open {
+  color: #b42318;
+  --fc: #c8402f;
+}
+
+/* 公司模式的節點閃光：被控制是紅色警報；擋下攻擊、奪回控制是綠色 */
+.game.office .fxo.o-capture {
+  --fc: #ff5a46;
+}
+.game.office .fxo.o-fail,
+.game.office .fxo.o-recapture {
+  --fc: #3fae7c;
+}
+.game.office .fxo.o-fail .redflash,
+.game.office .fxo.o-recapture .redflash {
+  background: radial-gradient(ellipse at center, rgba(63, 174, 124, 0.5), rgba(63, 174, 124, 0.12) 70%);
+}
+
+/* 公司模式的警戒條：警戒越高越接近抓到駭客，對公司是好事——用藍到綠，最後一格是金色 */
+.game.office .alert.zone1 {
+  border-color: #5683c9;
+}
+.game.office .alert.zone2 {
+  border-color: #2c8f66;
+}
+.game.office .alert .seg.on.z0 {
+  background: #7d93b2;
+}
+.game.office .alert.zone0 .zname {
+  color: var(--text2);
+}
+.game.office .alert .seg.on.z1 {
+  background: #3a72c4;
+}
+.game.office .alert .seg.on.z2 {
+  background: #2c8f66;
+}
+.game.office .alert .seg.on.z3 {
+  background: #c9952a;
+}
+.game.office .alert .seg.z3:not(.on) {
+  color: #b0862a;
+}
+.game.office .alert.zone1 .num,
+.game.office .alert.zone1 .zname {
+  color: #2a5fb0;
+}
+.game.office .alert.zone2 .num,
+.game.office .alert.zone2 .zname {
+  color: #1d6e47;
+}
+
+/* 公司模式的資訊面板：淺色卡片、上緣一條主題色、標題列在卡片裡 */
+.opanel {
+  --ac: var(--o-blue);
+  position: relative;
+  padding: 12px 16px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f7f9fb, #eef2f6);
+  border: 2px solid #c9d2de;
+  box-shadow:
+    inset 0 4px 0 var(--ac),
+    0 4px 12px rgba(20, 35, 60, 0.1);
+}
+.opanel > .ohead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 10px;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: color-mix(in srgb, var(--ac) 75%, #0b1426);
+}
+.opanel .oic {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--ac);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--ac) 40%, transparent);
+}
+
 /* 手機橫向只調整安全區與可捲內容，舞台仍維持原始比例。 */
 @media (pointer: coarse) and (orientation: landscape) and (max-width: 1000px) {
   html,
@@ -253,4 +485,17 @@ svg {
   syntax: '<percentage>';
   inherits: true;
   initial-value: 0%;
+}
+
+/* 公司模式的設定選單：白底深字（元件裡的 :global 規則不會生效，所以放在這裡） */
+.office .gm .menu {
+  background: #fff;
+  border-color: var(--edge2);
+  box-shadow: 0 14px 30px rgba(28, 39, 56, 0.22);
+}
+.office .gm .menu button {
+  color: var(--text);
+}
+.office .gm .menu button:hover {
+  background: var(--slate);
 }

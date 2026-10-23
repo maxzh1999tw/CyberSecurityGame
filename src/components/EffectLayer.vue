@@ -42,7 +42,7 @@ function beamPath(b: Beam): string {
       v-for="p in ui.plaques"
       :key="p.id"
       class="plaque"
-      :class="[p.tone, p.style]"
+      :class="[p.tone, p.style, { wide: p.wide }]"
       :style="{ left: p.x + 'px', top: p.y + 'px', animationDuration: p.ms + 'ms' }"
     >
       <div class="medal"><Icon :name="p.icon" :size="34" :stroke="2.3" /></div>
@@ -170,6 +170,9 @@ function beamPath(b: Beam): string {
 }
 .medal :deep(svg) {
   filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35));
+}
+.plaque.wide {
+  max-width: 780px;
 }
 .pt {
   display: flex;

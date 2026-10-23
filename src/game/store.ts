@@ -4,7 +4,9 @@ import { sfx } from '../audio/sfx'
 import { BACKUP_RESTORE_TURNS, CARDS, INFRA_PARALYZE_TURNS, IT_PARALYZE_TURNS, MISSION_IDS, recaptureTurnsOf, SCENARIO_IDS, VULNS } from './data'
 import * as E from './engine'
 import type { Playability, StepOutcome } from './engine'
-import type { CardId, GameState, MissionId, ScenarioId, Tri } from './types'
+import { companyDeadReason, companyPlayability, type DraftState } from './company'
+import { COMPANY_CARDS } from './companyData'
+import type { CardId, CompanyCardId, GameState, MissionId, ScenarioId, Tri } from './types'
 
 /** 設計基準：高 1080、寬至少 1920；寬螢幕會把舞台往左右延伸，不留黑邊 */
 export const BASE_W = 1920
@@ -27,7 +29,8 @@ export interface Rect {
 
 export interface DragState {
   uid: number
-  id: CardId
+  /** 駭客牌或公司牌（公司模式時是公司牌） */
+  id: CardId | CompanyCardId
   pointerId: number
   mode: 'node' | 'auto'
   x: number
@@ -63,6 +66,8 @@ export interface Plaque {
   style: 'stamp' | 'tag'
   /** 停留多久（毫秒） */
   ms: number
+  /** 說明比較長（例如封死任務的原因）：牌子放寬 */
+  wide?: boolean
 }
 
 /** 兩點之間飛行的光點（病毒封包） */
@@ -77,7 +82,11 @@ export interface Beam {
 
 /** 出牌演出：牌飛上場中央、射向目標，成功時爆開、失敗時撞碎或燒毀 */
 export interface CastSpec {
-  card: CardId
+  card: CardId | CompanyCardId
+  /** 公司模式打出的公司牌（牌面不同） */
+  company?: boolean
+  /** 牌面上的費用（公司牌有 IT 折扣時和原價不同） */
+  cost?: number
   from: { x: number; y: number; scale: number }
   to: { x: number; y: number }
   theme: 'scan' | 'hack' | 'frost' | 'alarm' | 'virus' | 'finish' | 'support'
@@ -88,6 +97,22 @@ export interface CastSpec {
 }
 
 export const castApi: { run: ((spec: CastSpec) => Promise<void>) | null } = { run: null }
+
+/** 公司模式：拖曳放開後交給 companyStore 出牌、換牌（避免兩個模組互相引用） */
+export const companyApi: {
+  play: ((uid: number, target: string | undefined, from: CastSpec['from']) => void) | null
+  recycle: ((uid: number) => void) | null
+} = { play: null, recycle: null }
+
+/** 現在輪到誰出牌（駭客模式是駭客，公司模式是公司） */
+const playerPhase = (s: GameState) => (s.mode === 'company' ? 'company' : 'hacker')
+/** 玩家手上的牌 */
+export const playerHand = (s: GameState): Array<{ uid: number; id: CardId | CompanyCardId }> =>
+  s.mode === 'company' ? s.company?.hand ?? [] : s.hand
+/** 玩家手上某張牌的可行性 */
+export function playerPlayability(s: GameState, id: CardId | CompanyCardId): Playability {
+  return s.mode === 'company' ? companyPlayability(s, id as CompanyCardId) : E.playability(s, id as CardId)
+}
 
 export interface BannerState {
   id: number
@@ -117,10 +142,12 @@ export function fitStage(vw: number, vh: number) {
 
 export const game = reactive({
   s: null as GameState | null,
-  screen: 'menu' as 'menu' | 'game' | 'review' | 'quiz',
+  screen: 'menu' as 'menu' | 'game' | 'review' | 'quiz' | 'draft',
   quizKind: 'pre' as 'pre' | 'post',
   scenario: 'factory' as ScenarioId,
   mission: null as MissionId | null,
+  /** 公司模式：組建中的公司 */
+  draft: null as DraftState | null,
 })
 
 export const ui = reactive({
@@ -137,9 +164,8 @@ export const ui = reactive({
   floaters: [] as Floater[],
   plaques: [] as Plaque[],
   beams: [] as Beam[],
-  toast: null as { id: number; text: string } | null,
+  toast: null as { id: number; text: string; tone: 'bad' | 'info' } | null,
   busy: false,
-  speed: 1,
   apShake: 0,
   alertShake: 0,
   intro: false,
@@ -151,6 +177,11 @@ export const ui = reactive({
   menuOpen: false,
   /** 第一次遊玩的導覽步驟（null 代表不顯示） */
   coach: null as number | null,
+  /** 公司模式：開業前的開場介紹 */
+  companyIntro: false,
+  /** 公司模式：駭客這局做過的事（右欄的駭客動態） */
+  /** 公司模式右欄的駭客動態；ok 是 null 代表牌還在生效中 */
+  hackerLog: [] as Array<{ id: number; turn: number; card: CardId; target: string | null; ok: boolean | null }>,
 })
 
 /** 遊戲是否已經結束（避免型別縮窄誤判） */
@@ -196,7 +227,7 @@ export function anchorRect(name: string): Rect | null {
 // ───────────────────────── 時間與特效 ─────────────────────────
 
 export const wait = (ms: number) =>
-  new Promise<void>((r) => setTimeout(r, Math.max(0, ms / ui.speed)))
+  new Promise<void>((r) => setTimeout(r, Math.max(0, ms)))
 
 let uidSeq = 1
 const nextId = () => uidSeq++
@@ -263,13 +294,13 @@ export function flashSlot(id: string, idx: number, fx: string, ms = 1100) {
 }
 
 let toastTimer = 0
-export function toast(text: string) {
-  ui.toast = { id: nextId(), text }
+export function toast(text: string, tone: 'bad' | 'info' = 'bad') {
+  ui.toast = { id: nextId(), text, tone }
   window.clearTimeout(toastTimer)
   toastTimer = window.setTimeout(() => (ui.toast = null), 1800)
 }
 
-async function showBanner(text: string, tone: BannerState['tone'], sub?: string, ms = 1100) {
+export async function showBanner(text: string, tone: BannerState['tone'], sub?: string, ms = 1100) {
   const id = nextId()
   ui.banner = { id, text, tone, sub }
   sfx.banner()
@@ -302,6 +333,13 @@ function dealGame(scenario: ScenarioId, mission?: MissionId) {
   const s = E.newGame({ scenario, mission })
   game.s = s
   game.screen = 'game'
+  resetBoardUi()
+  ui.intro = true
+  ui.freshCards = game.s.hand.map((c) => c.uid)
+}
+
+/** 開新局時清掉上一局留下的畫面狀態 */
+export function resetBoardUi() {
   ui.result = null
   ui.resultShown = false
   ui.drag = null
@@ -316,18 +354,15 @@ function dealGame(scenario: ScenarioId, mission?: MissionId) {
   ui.plaques = []
   ui.beams = []
   ui.banner = null
-  ui.speed = 1
   ui.coach = null
   ui.busy = true
-  ui.intro = true
-  ui.freshCards = game.s.hand.map((c) => c.uid)
+  ui.hackerLog = []
 }
 
 /** 玩家看完開場劇本、按下「開始」之後才發牌 */
 export function confirmIntro() {
   if (!ui.intro) return
   ui.intro = false
-  ui.speed = 1
   sfx.yourTurn()
   void (async () => {
     await wait(450)
@@ -341,13 +376,15 @@ export function confirmIntro() {
     await wait(uids.length * 120 + 600)
     ui.freshCards = []
     ui.busy = false
-    if (!coachSeen()) ui.coach = 0
+    if (!coachSeen('hacker')) ui.coach = 0
   })()
 }
 
-function coachSeen(): boolean {
+/** 第一次導覽看過了沒（駭客模式、公司模式分開記） */
+export const coachKey = (mode: 'hacker' | 'company') => (mode === 'company' ? 'csg-coach-company' : 'csg-coach')
+export function coachSeen(mode: 'hacker' | 'company'): boolean {
   try {
-    return localStorage.getItem('csg-coach') === '1'
+    return localStorage.getItem(coachKey(mode)) === '1'
   } catch {
     return true
   }
@@ -356,7 +393,6 @@ function coachSeen(): boolean {
 export function backToMenu() {
   game.screen = 'menu'
   ui.busy = false
-  ui.speed = 1
 }
 
 export function playerHasMoves(s: GameState): boolean {
@@ -368,7 +404,7 @@ export function playerHasMoves(s: GameState): boolean {
 
 /** 為什麼這張牌現在打不出去（給提示用） */
 export function deadReason(s: GameState, id: CardId): string {
-  const db = E.node(s, 'db')
+  const allDb = E.dbAccess(s)
   const infraCtrl = E.infraCtrl(s)
   const execCtrl = E.execCtrl(s)
   // 還沒開放的基礎設施／AI：指定目標的牌會被層級擋住
@@ -387,13 +423,13 @@ export function deadReason(s: GameState, id: CardId): string {
       if (!infraCtrl) return '需要先控制基礎設施與任一員工'
       return E.infras(s).every((n) => !n.controlled || n.virus) ? '已控制的基礎設施都已經有病毒在運作' : '需要先控制任一員工'
     case 'alarm':
-      return E.node(s, 'it').paralyzed > 1 ? `${E.node(s, 'it').name}仍在癱瘓中` : '需要基礎設施與員工入口，請查看牌面前置條件'
+      return E.its(s).every((n) => n.paralyzed > 1) ? 'IT 仍在癱瘓中' : '需要基礎設施與員工入口，請查看牌面前置條件'
     case 'wipe':
-      return E.node(s, 'backup').paralyzed > 0 ? '備份已經癱瘓' : '尚未取得破壞備份所需的入口或權限，請查看牌面條件'
+      return E.backups(s).every((n) => n.paralyzed > 0) ? '備份已經癱瘓' : '尚未取得破壞備份所需的入口或權限，請查看牌面條件'
     case 'ransom':
-      return db.controlled ? '備份仍可還原；控制或癱瘓備份，或揭露「破釜沉舟」' : '需要先控制資料庫'
+      return allDb ? '還有備份可以還原；讓所有備份失效、受控或癱瘓' : '需要先控制所有資料庫'
     case 'exfil':
-      return '需要先控制一名員工與資料庫'
+      return '需要先控制一名員工與所有資料庫'
     case 'wreck':
       return infraCtrl ? 'IT 還能應變：先控制他，或同回合癱瘓他' : '需要先控制基礎設施'
     case 'bec':
@@ -528,14 +564,15 @@ function onUp(ev: PointerEvent) {
   updateDrag(ev)
   ui.drag = null
   if (!d.moved) return
-  const inst = s.hand.find((c) => c.uid === d.uid)
+  const inst = playerHand(s).find((c) => c.uid === d.uid)
   if (!inst) return
 
+  if (s.mode === 'company') return dropCompanyCard(s, d)
   if (d.overPile) {
     void recycle(d.uid)
     return
   }
-  const pb = E.playability(s, d.id)
+  const pb = E.playability(s, d.id as CardId)
   const overBoard = d.y < playLine()
   if (d.mode === 'node') {
     if (!d.overNode) {
@@ -547,10 +584,10 @@ function onUp(ev: PointerEvent) {
         deny('目標尚未解鎖，請先建立入口')
         return
       }
-      deny(pb.status === 'dead' ? deadReason(s, d.id) : '這個目標不能用')
+      deny(pb.status === 'dead' ? deadReason(s, d.id as CardId) : '這個目標不能用')
       return
     }
-    if (s.ap < E.cardCost(s, d.id, d.overNode)) return denyAp()
+    if (s.ap < E.cardCost(s, d.id as CardId, d.overNode)) return denyAp()
     // 需要選目標的牌：放開前停在場下方中央
     void commitPlay(d.uid, d.overNode, { x: boardCenter(), y: view.h - 250, scale: 0.8 })
   } else {
@@ -558,10 +595,36 @@ function onUp(ev: PointerEvent) {
       sfx.cancel()
       return
     }
-    if (pb.status === 'dead') return deny(deadReason(s, d.id))
+    if (pb.status === 'dead') return deny(deadReason(s, d.id as CardId))
     if (!pb.affordable) return denyAp()
     void commitPlay(d.uid, undefined, { x: d.x, y: d.y, scale: d.y < playLine() ? 0.82 : 0.9 })
   }
+}
+
+/** 公司牌放開：拖到換牌區換牌、拖到節點或場上出牌（和駭客牌同樣的操作） */
+function dropCompanyCard(s: GameState, d: DragState) {
+  const id = d.id as CompanyCardId
+  if (d.overPile) {
+    companyApi.recycle?.(d.uid)
+    return
+  }
+  const pb = companyPlayability(s, id)
+  if (d.mode === 'node') {
+    if (!d.overNode) {
+      sfx.cancel()
+      return
+    }
+    if (pb.status === 'dead') return deny(companyDeadReason(s, id))
+    if (!pb.targets[d.overNode]) return deny(`「${COMPANY_CARDS[id].name}」不能用在${E.node(s, d.overNode).name}`)
+    companyApi.play?.(d.uid, d.overNode, { x: boardCenter(), y: view.h - 250, scale: 0.8 })
+    return
+  }
+  if (d.y >= playLine()) {
+    sfx.cancel()
+    return
+  }
+  if (pb.status === 'dead') return deny(companyDeadReason(s, id))
+  companyApi.play?.(d.uid, undefined, { x: d.x, y: d.y, scale: 0.82 })
 }
 
 function deny(text: string) {
@@ -576,18 +639,20 @@ function denyAp() {
 
 export function pointerDownCard(uid: number, ev: PointerEvent, current: PointerEvent = ev) {
   const s = game.s
-  if (!s || ui.busy || s.phase !== 'hacker' || ev.button !== 0) return
-  const inst = s.hand.find((c) => c.uid === uid)
+  if (!s || ui.busy || s.phase !== playerPhase(s) || ev.button !== 0) return
+  const inst = playerHand(s).find((c) => c.uid === uid)
   if (!inst) return
   sfx.unlock()
   const start = toStage(ev.clientX, ev.clientY)
   const p = toStage(current.clientX, current.clientY)
-  const pb = E.playability(s, inst.id)
+  const pb = playerPlayability(s, inst.id)
+  const mode: DragState['mode'] =
+    s.mode === 'company' ? (COMPANY_CARDS[inst.id as CompanyCardId].target ? 'node' : 'auto') : CARDS[inst.id as CardId].targeting
   ui.drag = {
     uid,
     id: inst.id,
     pointerId: ev.pointerId,
-    mode: CARDS[inst.id].targeting,
+    mode,
     x: p.x,
     y: p.y,
     sx: start.x,
@@ -622,7 +687,6 @@ async function safely(fn: () => Promise<void>) {
     ui.recycling = null
     ui.drag = null
       ui.banner = null
-    ui.speed = 1
     ui.busy = !!game.s && game.s.phase === 'over'
   }
 }
@@ -659,6 +723,12 @@ const SUPPORT_AIM: Partial<Record<CardId, string>> = {
   energy: 'ap',
   stash: 'ap',
 }
+/** 公司模式：右下角是公司自己的牌堆，駭客的支援牌改飛向右上角駭客的資訊（手牌、行動點） */
+const HACKER_AIM: Record<string, string> = { deck: 'hackerDeck', ap: 'hackerAp' }
+const aimAnchor = (s: GameState, id: CardId) => {
+  const a = SUPPORT_AIM[id]
+  return a && s.mode === 'company' ? HACKER_AIM[a] ?? a : a
+}
 
 async function commitPlayInner(uid: number, targetId?: string, from?: CastSpec['from']) {
   const s = game.s
@@ -679,7 +749,8 @@ async function commitPlayInner(uid: number, targetId?: string, from?: CastSpec['
   // 飛行的終點：目標節點；不用選目標的牌，飛向它實際影響的節點
   const ef = preview?.effect
   const aimId = targetId ?? ef?.captured[0] ?? ef?.paralyzed ?? ef?.revealed[0]?.node ?? E.hintNodes(s, id)[0] ?? null
-  const aimRect = SUPPORT_AIM[id] ? anchorRect(SUPPORT_AIM[id]!) : aimId ? nodeRect(aimId) : null
+  const aim = aimAnchor(s, id)
+  const aimRect = aim ? anchorRect(aim) : aimId ? nodeRect(aimId) : null
   const tx = aimRect ? aimRect.cx : boardCenter()
   const ty = aimRect ? aimRect.cy : 420
 
@@ -721,6 +792,31 @@ async function commitPlayInner(uid: number, targetId?: string, from?: CastSpec['
 
 /** 一個節點上這次發生的事，濃縮成一塊銘牌 */
 type Note = Omit<Plaque, 'id' | 'x' | 'y' | 'ms'>
+
+/**
+ * 公司模式從公司的角度看駭客那一方的事件：駭客成功（控制、得手、利用捷徑）是紅色警報，
+ * 駭客失敗、公司修好或奪回是綠色。駭客模式維持原樣。
+ */
+const COMPANY_TITLE: Record<string, string> = {
+  '控制!': '被入侵!',
+  '控制延長': '入侵延長',
+  '利用捷徑': '被抄捷徑',
+  '癱瘓': '被癱瘓',
+  '得手!': '駭客得手!',
+  '發現弱點': '弱點曝光',
+  '被還原': '從備份還原',
+  '失敗': '擋下攻擊',
+  '被擋下': '防護擋下',
+  '被修復': '修補完成',
+  '被奪回': '奪回控制',
+}
+function hackerPlaque(x: number, y: number, p: Parameters<typeof plaque>[2], ms?: number) {
+  if (game.s?.mode === 'company') {
+    const tone: Plaque['tone'] = p.tone === 'good' || p.tone === 'gold' ? 'bad' : p.tone === 'bad' ? 'good' : p.tone
+    p = { ...p, title: COMPANY_TITLE[p.title] ?? p.title, tone }
+  }
+  plaque(x, y, p, ms)
+}
 
 async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: number) {
   const s = game.s!
@@ -783,7 +879,7 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
       notes.set(infected, { title: '被感染', sub: '病毒開始潛伏，每回合回報一個弱點', tone: 'virus', icon: 'bug', style: 'stamp' })
     } else if (ef.finish) {
       sfx.success()
-      const id = aimId ?? 'db'
+      const id = aimId ?? E.dbs(s)[0]?.id ?? ''
       notes.set(id, { title: '得手!', tone: 'gold', icon: 'flag', style: 'stamp' })
     } else if (def.cat === 'support') {
       await presentSupport(r)
@@ -793,8 +889,9 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
     }
   } else if (ef.partial) {
     sfx.fail()
-    flashNode('db', 'fail', 1000)
-    notes.set('db', { title: '被還原', sub: '公司從備份還原了資料', tone: 'bad', icon: 'database-backup', style: 'stamp' })
+    const restored = E.dbs(s)[0]?.id ?? ''
+    flashNode(restored, 'fail', 1000)
+    notes.set(restored, { title: '被還原', sub: '公司從備份還原了資料', tone: 'bad', icon: 'database-backup', style: 'stamp' })
   } else {
     sfx.fail()
     if (failNode) flashNode(failNode, 'fail', 1000)
@@ -829,7 +926,7 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
     if (at >= 0) flashSlot(id, at, 'reveal', 1400)
   }
   if (ef.dry.length > 2) {
-    plaque(boardCenter(), 400, { title: '掃描完畢', sub: '整間公司沒有更多弱點了', tone: 'info', icon: 'scan-eye' })
+    hackerPlaque(boardCenter(), 400, { title: '掃描完畢', sub: '整間公司沒有更多弱點了', tone: 'info', icon: 'scan-eye' })
   } else {
     for (const id of ef.dry) {
       if (notes.has(id)) continue
@@ -844,17 +941,17 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
 
   for (const [id, note] of notes) {
     const rr = nodeRect(id)
-    if (rr) plaque(rr.cx, rr.cy - 6, note)
+    if (rr) hackerPlaque(rr.cx, rr.cy - 6, note)
   }
 
   if (r.refund) {
     ui.apShake++
     const rr = aimId ? nodeRect(aimId) : null
-    float(rr?.cx ?? boardCenter(), (rr?.cy ?? 420) + 70, '省下 1 點', 'gold', 'zap')
+    float(rr?.cx ?? boardCenter(), (rr?.cy ?? 420) + 70, '省下 1 點', s.mode === 'company' ? 'bad' : 'gold', 'zap')
   }
   if (r.noise > 0) {
     const ar = anchorRect('alert')
-    if (ar) float(ar.cx, ar.cy + 50, `+${r.noise}`, 'noise')
+    if (ar) float(ar.cx, ar.cy + 50, `+${r.noise}`, s.mode === 'company' ? 'good' : 'noise')
     sfx.noiseUp(r.noise)
     ui.alertShake++
   } else if (!r.win && s.alert === alertBefore) {
@@ -866,7 +963,7 @@ async function presentPlay(r: E.PlayResult, aimId: string | null, alertBefore: n
 /** 資源管理牌的結果：在對應的位置（警戒條、行動點、牌堆）旁放銘牌 */
 async function presentSupport(r: E.PlayResult) {
   const ef = r.effect
-  const where = SUPPORT_AIM[r.card]
+  const where = game.s ? aimAnchor(game.s, r.card) : SUPPORT_AIM[r.card]
   const ar = where ? anchorRect(where) : null
   const x = Math.max(340, Math.min(view.w - 340, ar?.cx ?? boardCenter()))
   const y = ar?.cy ?? 420
@@ -875,7 +972,7 @@ async function presentSupport(r: E.PlayResult) {
     case 'proxy':
       sfx.coolDown()
       ui.alertShake++
-      plaque(x, y + 92, {
+      hackerPlaque(x, y + 92, {
         title: `警戒 ${ef.alertDelta}`,
         sub: r.card === 'wipelog' ? '日誌被清掉了' : '追查的人迷路了',
         tone: 'ice',
@@ -885,7 +982,7 @@ async function presentSupport(r: E.PlayResult) {
       break
     case 'darkweb': {
       const n = ef.drawn.length
-      plaque(x, y - 96, {
+      hackerPlaque(x, y - 96, {
         title: n ? `抽 ${n} 張` : '沒有抽到牌',
         sub: n < 2 ? `手牌最多 ${E.HAND_MAX} 張` : undefined,
         tone: 'gold',
@@ -904,12 +1001,12 @@ async function presentSupport(r: E.PlayResult) {
     case 'energy':
       sfx.success()
       ui.apShake++
-      plaque(x, y - 96, { title: '行動點 +2', sub: '本回合', tone: 'good', icon: 'coffee', style: 'stamp' })
+      hackerPlaque(x, y - 96, { title: '行動點 +2', sub: '本回合', tone: 'good', icon: 'coffee', style: 'stamp' })
       break
     case 'stash':
       sfx.reveal()
       ui.apShake++
-      plaque(x, y - 96, {
+      hackerPlaque(x, y - 96, {
         title: '保留上限 4',
         sub: '回合結束最多保留 4 點行動點',
         tone: 'gold',
@@ -968,17 +1065,9 @@ async function endTurnInner() {
   ui.hoverNode = null
   ui.hoverSlot = null
   sfx.endTurn()
-  ui.speed = 1
   await wait(350)
 
-  const gen = E.endOfTurn(s)
-  let step = gen.next()
-  while (!step.done) {
-    await presentStep(step.value)
-    if (isOver(s)) break
-    step = gen.next()
-  }
-  ui.speed = 1
+  await presentEndOfTurn()
   if (isOver(s)) {
     await finishGame()
     return
@@ -994,21 +1083,34 @@ async function endTurnInner() {
   ui.busy = false
 }
 
+/** 播放駭客回合結束的每一步（公司模式的電腦駭客也用這個） */
+export async function presentEndOfTurn() {
+  const s = game.s!
+  const gen = E.endOfTurn(s)
+  let step = gen.next()
+  while (!step.done) {
+    await presentStep(step.value)
+    if (isOver(s)) break
+    step = gen.next()
+  }
+}
+
 async function presentStep(step: StepOutcome) {
   const s = game.s!
   switch (step.t) {
     case 'frozen': {
       const infraPaused = step.reason === 'infraParalyzed'
       const downInfra = E.infras(s).find((n) => n.paralyzed > 0)
-      const anchor = nodeRect(infraPaused && downInfra ? downInfra.id : 'it')
+      const it = E.its(s)[0]
+      const anchor = nodeRect(infraPaused && downInfra ? downInfra.id : it?.id ?? '')
       if (anchor) {
-        plaque(anchor.cx, anchor.cy - 6, {
+        hackerPlaque(anchor.cx, anchor.cy - 6, {
           title: step.both ? '公司全面停擺' : '修復暫停',
           sub: infraPaused
             ? '網路中斷：修復與奪回都停了'
             : step.both
-              ? `${E.node(s, 'it').name}被癱瘓：修復與奪回都停了`
-              : `${E.node(s, 'it').name}被你控制`,
+              ? `${it?.name ?? 'IT'}被癱瘓：修復與奪回都停了`
+              : `${it?.name ?? 'IT'}${s.mode === 'company' ? '被駭客控制' : '被你控制'}`,
           tone: 'ice',
           icon: 'snowflake',
           style: 'tag',
@@ -1022,7 +1124,7 @@ async function presentStep(step: StepOutcome) {
       sfx.patch()
       flashSlot(step.node, step.idx, 'patch', 1800)
       const rr = nodeRect(step.node)
-      if (rr) plaque(rr.cx, rr.cy - 6, { title: '被修復', sub: `「${E_vulnName(step.vuln)}」`, tone: 'bad', icon: 'wrench', style: 'stamp' })
+      if (rr) hackerPlaque(rr.cx, rr.cy - 6, { title: '被修復', sub: `「${E_vulnName(step.vuln)}」`, tone: 'bad', icon: 'wrench', style: 'stamp' })
       await wait(600)
       await showBanner('弱點被修復', 'company', step.name, 1000)
       await wait(500)
@@ -1030,9 +1132,9 @@ async function presentStep(step: StepOutcome) {
     }
     case 'restore': {
       sfx.patch()
-      flashNode('backup', 'restore', 1400)
-      const rr = nodeRect('backup')
-      if (rr) plaque(rr.cx, rr.cy - 6, { title: '備份恢復', sub: '備份又能正常運作了', tone: 'bad', icon: 'database-backup', style: 'stamp' })
+      flashNode(step.node, 'restore', 1400)
+      const rr = nodeRect(step.node)
+      if (rr) hackerPlaque(rr.cx, rr.cy - 6, { title: '備份恢復', sub: '備份又能正常運作了', tone: 'bad', icon: 'database-backup', style: 'stamp' })
       await wait(1300)
       break
     }
@@ -1040,10 +1142,11 @@ async function presentStep(step: StepOutcome) {
       sfx.recapture()
       flashNode(step.node, 'recapture', 1600)
       const rr = nodeRect(step.node)
-      if (rr) plaque(rr.cx, rr.cy - 6, { title: '被奪回', sub: step.name, tone: 'bad', icon: 'shield-alert', style: 'stamp' })
+      if (rr) hackerPlaque(rr.cx, rr.cy - 6, { title: '被奪回', sub: step.name, tone: 'bad', icon: 'shield-alert', style: 'stamp' })
       if (step.patched) flashSlot(step.patched.node, step.patched.idx, 'patch', 1800)
       await wait(600)
-      await showBanner('節點被奪回', 'danger', step.name, 1100)
+      if (s.mode === 'company') await showBanner('奪回控制', 'company', step.name, 1100)
+      else await showBanner('節點被奪回', 'danger', step.name, 1100)
       await wait(500)
       break
     }
@@ -1054,7 +1157,7 @@ async function presentStep(step: StepOutcome) {
         for (const id of new Set(step.from)) {
           const inf = nodeRect(id)
           flashNode(id, 'pulse', 1100)
-          if (inf) plaque(inf.cx, inf.cy - 6, { title: '病毒觸發', sub: '賽博病毒回報中', tone: 'virus', icon: 'bug', style: 'tag' }, 1500)
+          if (inf) hackerPlaque(inf.cx, inf.cy - 6, { title: '病毒觸發', sub: '賽博病毒回報中', tone: 'virus', icon: 'bug', style: 'tag' }, 1500)
         }
         await wait(650)
         for (const [i, r] of step.revealed.entries()) {
@@ -1067,7 +1170,7 @@ async function presentStep(step: StepOutcome) {
           const sl = E.node(s, r.node).slots[r.idx]
           const rr = nodeRect(r.node)
           if (rr) {
-            plaque(
+            hackerPlaque(
               rr.cx,
               rr.cy - 6,
               { title: '病毒發現', sub: `「${E_vulnName(sl.vuln)}」・${E.node(s, r.node).name}`, tone: 'virus', icon: 'bug', style: 'stamp' },
@@ -1082,7 +1185,7 @@ async function presentStep(step: StepOutcome) {
     case 'cooldown': {
       if (step.delta < 0) {
         const ar = anchorRect('alert')
-        if (ar) float(ar.cx, ar.cy + 50, `${step.delta}`, 'good', 'snowflake')
+        if (ar) float(ar.cx, ar.cy + 50, `${step.delta}`, s.mode === 'company' ? 'bad' : 'good', 'snowflake')
         sfx.coolDown()
         ui.alertShake++
         await wait(700)
@@ -1096,12 +1199,14 @@ async function presentStep(step: StepOutcome) {
 
 // ───────────────────────── 結束 ─────────────────────────
 
-async function finishGame() {
+export async function finishGame() {
   const s = game.s!
   ui.result = s.result
   ui.busy = true
   await wait(700)
-  if (s.result === 'win') sfx.win()
+  // 公司模式：駭客輸了才是玩家贏
+  const won = s.mode === 'company' ? s.result === 'lose' : s.result === 'win'
+  if (won) sfx.win()
   else sfx.lose()
   ui.resultShown = true
 }
@@ -1129,8 +1234,3 @@ export function toggleFullscreen() {
     /* 瀏覽器不允許就算了 */
   }
 }
-
-export function fastForward() {
-  if (ui.busy && !ui.resultShown && !ui.intro) ui.speed = 4
-}
-

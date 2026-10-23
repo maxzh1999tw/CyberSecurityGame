@@ -3,13 +3,14 @@
 //   成功：爆開、吸收；被防護擋下：撞碎成碎片；什麼也沒發生：從下往上燒成灰
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { sfx } from '../audio/sfx'
-import { boardCenter, castApi, ui, view } from '../game/store'
+import { boardCenter, castApi, view } from '../game/store'
 import type { CastSpec } from '../game/store'
-import type { CardId } from '../game/types'
+import type { CardId, CompanyCardId } from '../game/types'
 import CardFace from './CardFace.vue'
+import CompanyCardFace from './CompanyCardFace.vue'
 
 const root = ref<HTMLElement | null>(null)
-const cur = ref<{ card: CardId; shards: boolean; burn: boolean; theme: CastSpec['theme'] } | null>(null)
+const cur = ref<{ card: CardId | CompanyCardId; company: boolean; cost?: number; shards: boolean; burn: boolean; theme: CastSpec['theme'] } | null>(null)
 const cardEl = ref<HTMLElement | null>(null)
 const faceEl = ref<HTMLElement | null>(null)
 const shardEls = ref<HTMLElement[]>([])
@@ -26,8 +27,7 @@ const THEME: Record<CastSpec['theme'], { c: string; c2: string }> = {
 }
 
 // ───────────── 小工具 ─────────────
-const rate = () => Math.max(0.05, ui.speed)
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms / rate()))
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 const rnd = (r: [number, number]) => r[0] + Math.random() * (r[1] - r[0])
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
 const ease = {
@@ -41,7 +41,7 @@ const ease = {
   },
 }
 
-/** 逐格動畫（跟快轉連動；畫面被擋住沒在跑時，用計時器保底，不會卡住遊戲） */
+/** 逐格動畫（畫面被擋住沒在跑時，用計時器保底，不會卡住遊戲） */
 function tween(ms: number, fn: (t: number) => void): Promise<void> {
   return new Promise((resolve) => {
     let done = false
@@ -55,7 +55,7 @@ function tween(ms: number, fn: (t: number) => void): Promise<void> {
     }
     const step = (now: number) => {
       if (done) return
-      acc += (now - last) * rate()
+      acc += now - last
       last = now
       const t = Math.min(1, acc / ms)
       fn(t)
@@ -63,7 +63,7 @@ function tween(ms: number, fn: (t: number) => void): Promise<void> {
       else finish()
     }
     requestAnimationFrame(step)
-    setTimeout(finish, (ms * 2) / rate() + 400)
+    setTimeout(finish, ms * 2 + 400)
   })
 }
 
@@ -119,7 +119,6 @@ function burst(x: number, y: number, o: PartOpt) {
       ],
       { duration: rnd(o.life), easing: 'cubic-bezier(.15,.7,.3,1)', fill: 'forwards' },
     )
-    a.playbackRate = rate()
     a.onfinish = () => el.remove()
   }
 }
@@ -148,7 +147,6 @@ function gather(x: number, y: number, color: string, n: number) {
       ],
       { duration: rnd([260, 420]), easing: 'cubic-bezier(.3,0,.7,1)', fill: 'both', delay: Math.random() * 90 },
     )
-    a.playbackRate = rate()
     a.onfinish = () => el.remove()
   }
 }
@@ -171,7 +169,6 @@ function ring(x: number, y: number, color: string, o: { r: number; dur: number; 
     ],
     { duration: o.dur, easing: 'cubic-bezier(.1,.7,.3,1)', fill: 'both', delay: o.delay ?? 0 },
   )
-  a.playbackRate = rate()
   a.onfinish = () => el.remove()
 }
 
@@ -183,14 +180,13 @@ function flashScreen(color: string, ms: number, peak = 0.35) {
   el.style.background = color
   host.appendChild(el)
   const a = el.animate([{ opacity: 0 }, { opacity: peak, offset: 0.25 }, { opacity: 0 }], { duration: ms, fill: 'forwards' })
-  a.playbackRate = rate()
   a.onfinish = () => el.remove()
 }
 
 function shake(px: number, ms: number) {
   const el = root.value?.parentElement
   if (!el) return
-  const a = el.animate(
+  el.animate(
     [
       { transform: 'translate(0,0)' },
       { transform: `translate(${-px}px, ${px * 0.4}px)` },
@@ -201,7 +197,6 @@ function shake(px: number, ms: number) {
     ],
     { duration: ms, easing: 'ease-out' },
   )
-  a.playbackRate = rate()
 }
 
 /** 各種牌命中時的特效 */
@@ -224,7 +219,6 @@ function impactFx(theme: CastSpec['theme'], x: number, y: number) {
           ],
           { duration: 760, easing: 'ease-out', fill: 'forwards' },
         )
-        a.playbackRate = rate()
         a.onfinish = () => el.remove()
       }
       ring(x, y, T.c, { r: 170, dur: 620 })
@@ -252,7 +246,6 @@ function impactFx(theme: CastSpec['theme'], x: number, y: number) {
             delay: i * 28,
             fill: 'both',
           })
-          a.playbackRate = rate()
           a.onfinish = () => el.remove()
         }
       }
@@ -310,7 +303,7 @@ const setShardEl = (el: unknown, i: number) => {
 // ───────────── 主流程 ─────────────
 async function run(spec: CastSpec) {
   const T = THEME[spec.theme]
-  cur.value = { card: spec.card, shards: false, burn: false, theme: spec.theme }
+  cur.value = { card: spec.card, company: !!spec.company, cost: spec.cost, shards: false, burn: false, theme: spec.theme }
   shardEls.value = []
   await nextTick()
   const el = cardEl.value
@@ -422,7 +415,7 @@ async function shatter(P: Pose) {
     const dur = rnd([760, 980])
     // 動畫放在內層：外層負責把碎片擺在牌原本的位置
     const inner = sh.firstElementChild as HTMLElement
-    const a = inner.animate(
+    inner.animate(
       [
         { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
         { transform: `translate(${dx * 0.7}px, ${dy * 0.7 - 34}px) rotate(${spin * 0.45}deg)`, opacity: 1, offset: 0.35 },
@@ -430,7 +423,6 @@ async function shatter(P: Pose) {
       ],
       { duration: dur, easing: 'cubic-bezier(.3,.1,.6,1)', fill: 'forwards' },
     )
-    a.playbackRate = rate()
   })
   await sleep(1000)
 }
@@ -475,14 +467,18 @@ onBeforeUnmount(() => {
       <!-- 打出去的那張牌 -->
       <div ref="cardEl" class="cc" :class="{ burning: cur.burn }">
         <div class="glow"></div>
-        <div ref="faceEl" class="face"><CardFace :id="cur.card" /></div>
+        <div ref="faceEl" class="face">
+          <CompanyCardFace v-if="cur.company" :id="cur.card as CompanyCardId" :cost="cur.cost" />
+          <CardFace v-else :id="cur.card as CardId" />
+        </div>
         <div v-if="cur.burn" class="front"></div>
       </div>
       <!-- 撞碎時的碎片 -->
       <template v-if="cur.shards">
         <div v-for="(sh, i) in shardInfo" :key="i" :ref="(el) => setShardEl(el, i)" class="cc sh">
           <div class="shi" :style="{ clipPath: sh.clip, transformOrigin: sh.cx + 'px ' + sh.cy + 'px' }">
-            <CardFace :id="cur.card" />
+            <CompanyCardFace v-if="cur.company" :id="cur.card as CompanyCardId" :cost="cur.cost" />
+            <CardFace v-else :id="cur.card as CardId" />
           </div>
         </div>
       </template>

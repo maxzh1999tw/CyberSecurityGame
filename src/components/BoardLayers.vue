@@ -23,7 +23,8 @@ const access = computed(() => {
 // 還沒解鎖的層先把節點藏起來；捷徑（例如受控 AI 的萬能鑰匙）已經打開的節點照樣出現
 const visible = (n: GameNode) => {
   const s = game.s
-  return !s || n.controlled || canRecon(s, n) || reachKnown(s, n) === 'Y'
+  // 公司模式：自己的公司當然全部看得到
+  return !s || s.mode === 'company' || n.controlled || canRecon(s, n) || reachKnown(s, n) === 'Y'
 }
 const rows = computed(() => {
   const by = (l: number) => {
@@ -52,6 +53,13 @@ const gateLabel = (layer: number) => {
   if (!s) return ''
   const name = layer === 2 ? '核心' : '內網'
   const targets = s.nodes.filter((n) => n.layer === layer)
+  // 公司模式：從公司的角度說駭客打到哪裡了
+  if (s.mode === 'company') {
+    if (s.nodes.some((n) => n.layer >= layer - 1 && n.controlled)) return `警告：駭客已經能攻擊${name}`
+    const reachable = targets.filter((n) => !n.controlled && reachKnown(s, n) === 'Y')
+    if (reachable.length) return `警告：駭客找到捷徑，碰得到${reachable.map((n) => n.name).join('、')}`
+    return `駭客要先控制任一${layer === 2 ? '內網' : '外圍'}節點，才能攻擊${name}`
+  }
   if (targets.every((n) => n.controlled)) return `${name}已控制`
   if (s.nodes.some((n) => n.layer >= layer - 1 && n.controlled)) return `${name}已開放 · 可對目標出牌`
   const reachable = targets.filter((n) => !n.controlled && reachKnown(s, n) === 'Y')
@@ -268,7 +276,7 @@ const gateText = (layer: number) => {
   letter-spacing: 3px;
 }
 .fog span {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   opacity: 0.8;
 }
@@ -277,7 +285,7 @@ const gateText = (layer: number) => {
   height: 120px;
 }
 .fog.partial b {
-  font-size: 17px;
+  font-size: 19px;
   letter-spacing: 1px;
 }
 /* 解鎖時節點從霧裡浮出來；其他節點平滑讓位 */
@@ -384,7 +392,7 @@ const gateText = (layer: number) => {
 .gate-label {
   flex: none;
   max-width: 70%;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;

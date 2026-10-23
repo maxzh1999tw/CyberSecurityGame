@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // 公司裡的一個節點（員工、AI、設備、資料……）
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { companyKnows } from '../game/company'
+import { HIRES } from '../game/companyData'
 import { VULNS } from '../game/data'
-import { etaOf, isImpregnable, reachKnown, recaptureBlock, recaptureSpeedOf, repairBlock, speedOf } from '../game/engine'
+import { etaOf, isImpregnable, reachKnown, recaptureBlock, recaptureSpeedOf, repairBlock, repairSpeedOf, speedOf } from '../game/engine'
 import { game, registerNode, ui } from '../game/store'
-import type { GameNode, VulnId } from '../game/types'
+import type { GameNode, Slot, VulnId } from '../game/types'
 import Icon from './Icon.vue'
 import NodeArt from './NodeArt.vue'
 
@@ -29,6 +31,9 @@ const kindTag = computed(() => {
 })
 
 const n = computed(() => props.node)
+/** 公司模式：畫面是公司的視角（看得到自己稽核過的牌，沒有自動倒數） */
+const company = computed(() => game.s?.mode === 'company')
+const seen = (sl: Slot) => (company.value ? companyKnows(sl) : sl.vis !== 0)
 
 // 待機動畫的相位與眨眼節奏：依節點 id 固定錯開，同一層的人不會同時眨眼
 const idle = computed(() => {
@@ -47,6 +52,7 @@ const BUGS = Array.from({ length: 8 }, (_, i) => {
 
 const ability = computed(() => {
   const nd = n.value
+  if (company.value) return null
   if (nd.role === 'boss') return { icon: 'crown', text: '−1' }
   if (nd.role === 'chairman') return { icon: 'hand-coins', text: '−1' }
   if (nd.kind === 'employee' && nd.role !== 'it') return { icon: 'zap', text: '+1' }
@@ -61,12 +67,14 @@ const ability = computed(() => {
 const speed = computed(() => (game.s ? speedOf(game.s) : 1))
 const rFrozen = computed(() => !!game.s && repairBlock(game.s) !== null)
 const cFrozen = computed(() => !!game.s && recaptureBlock(game.s) !== null)
+// 被癱瘓、隔離、受訓的節點這回合沒有產值（被控制的照常上班）
+const producing = computed(() => n.value.paralyzed <= 0 && !n.value.isolated && !n.value.training)
 const recapEta = computed(() => etaOf(n.value.timer, game.s ? recaptureSpeedOf(game.s, n.value) : speed.value))
 const restorePaused = computed(() => n.value.role === 'backup' && rFrozen.value)
 const restoreEta = computed(() => n.value.role === 'infra' ? n.value.paralyzed : etaOf(n.value.paralyzed, speed.value))
 
 const locked = computed(() => {
-  if (!game.s || n.value.layer === 0 || n.value.controlled) return false
+  if (!game.s || company.value || n.value.layer === 0 || n.value.controlled) return false
   return reachKnown(game.s, n.value) !== 'Y'
 })
 
@@ -80,31 +88,35 @@ interface SlotView {
   fx: string
   /** 公開的弱點：公司修復的倒數（回合） */
   eta: number
+  /** 駭客也知道（公司模式才需要區分） */
+  pub: boolean
 }
 
 // 完全沒有弱點的節點：被偵查牌翻過之後，其中一張蓋著的牌會翻成「無懈可擊」
-const wallIdx = computed(() => (n.value.sealed && isImpregnable(n.value) ? n.value.slots.findIndex((sl) => sl.vis === 0) : -1))
+const wallIdx = computed(() => (!company.value && n.value.sealed && isImpregnable(n.value) ? n.value.slots.findIndex((sl) => sl.vis === 0) : -1))
 
 const slots = computed<SlotView[]>(() =>
   n.value.slots.map((sl, idx) => {
     const d = VULNS[sl.vuln]
     const fx = ui.slotFx[n.value.id + ':' + idx] ?? ''
-    if (idx === wallIdx.value) return { idx, state: 'wall', name: '無懈可擊', icon: 'shield-check', vis: 2, kind: d.kind, fx, eta: 0 }
-    if (sl.vis === 0) return { idx, state: 'hidden', name: '', icon: '', vis: 0, kind: d.kind, fx, eta: 0 }
+    const pub = sl.vis === 2
+    if (idx === wallIdx.value) return { idx, state: 'wall', name: '無懈可擊', icon: 'shield-check', vis: 2, kind: d.kind, fx, eta: 0, pub }
+    if (!seen(sl)) return { idx, state: 'hidden', name: '', icon: '', vis: 0, kind: d.kind, fx, eta: 0, pub }
     if (sl.shield)
-      return { idx, state: 'shield', name: d.shield, icon: 'shield-check', vis: sl.vis, kind: d.kind, fx, eta: 0 }
+      return { idx, state: 'shield', name: d.shield, icon: 'shield-check', vis: 2, kind: d.kind, fx, eta: 0, pub }
     if (sl.fixed)
-      return { idx, state: 'fixed', name: d.shield, icon: 'wrench', vis: 2, kind: d.kind, fx, eta: 0 }
-    const nullified = n.value.slots.some((o) => o.shield && o.vuln === sl.vuln && o.vis > 0)
+      return { idx, state: 'fixed', name: d.shield, icon: 'wrench', vis: 2, kind: d.kind, fx, eta: 0, pub }
+    const nullified = n.value.slots.some((o) => o.shield && o.vuln === sl.vuln && seen(o))
     return {
       idx,
       state: nullified ? 'struck' : 'vuln',
       name: d.name,
       icon: d.icon,
-      vis: sl.vis,
+      vis: 2 as const,
       kind: d.kind,
       fx,
-      eta: sl.timer !== undefined ? etaOf(sl.timer, speed.value) : 0,
+      eta: sl.timer !== undefined && game.s ? etaOf(sl.timer, repairSpeedOf(game.s)) : 0,
+      pub,
     }
   }),
 )
@@ -145,6 +157,13 @@ function enter(ev: PointerEvent) {
     ui.hoverNode = n.value.id
   }
 }
+/** 弱點格上眼睛標記的說明：誰揭露的、幾回合後修好 */
+function eyeTitle(s: SlotView): string {
+  const who = !company.value || s.pub ? '駭客揭露的：駭客也知道' : '公司自己偵查到的：駭客看不到'
+  if (!s.eta) return who
+  return `${who}（${rFrozen.value ? '修補暫停中' : `${s.eta} 回合後修好`}）`
+}
+
 function leave() {
   if (ui.hoverNode === n.value.id) ui.hoverNode = null
   if (ui.hoverSlot?.nodeId === n.value.id) ui.hoverSlot = null
@@ -174,21 +193,11 @@ function leave() {
       <div class="info" :class="{ badged: ability }">
         <div class="name">{{ n.name }}</div>
         <div class="sub">
-          <span class="kind"><Icon :name="kindTag.icon" :size="16" :stroke="2.4" />{{ kindTag.text }}</span>
-          <span v-if="n.controlled" class="pill ctrl" title="公司奪回的倒數">
-            已控制<span class="eta" :key="recapEta">
-              <Icon :name="cFrozen ? 'snowflake' : 'timer'" :size="14" :stroke="2.6" />{{ cFrozen ? '' : recapEta }}
+          <span class="kind"><Icon :name="kindTag.icon" :size="16" :stroke="2.4" />{{ company && n.econ ? HIRES[n.econ.hire].label : kindTag.text }}</span>
+          <span v-if="excluded.length" class="excl">
+            <span v-for="v in excluded" :key="v" class="ex-ico">
+              <Icon :name="VULNS[v].icon" :size="15" :stroke="2.2" /><i></i>
             </span>
-          </span>
-          <span v-if="n.paralyzed > 0" class="pill para">
-            <Icon name="snowflake" :size="14" :stroke="2.6" />癱瘓
-            <template v-if="n.role === 'it'"> {{ n.paralyzed }} 回</template>
-            <span v-else class="eta" :key="restoreEta">
-              <Icon :name="restorePaused ? 'snowflake' : 'timer'" :size="14" :stroke="2.6" />{{ restorePaused ? '' : restoreEta }}
-            </span>
-          </span>
-          <span v-if="n.virus && n.controlled" class="pill virus" :class="{ paused: n.paralyzed > 0 }">
-            <Icon name="bug" :size="14" :stroke="2.6" />{{ n.paralyzed > 0 ? '病毒暫停' : '病毒' }}
           </span>
         </div>
       </div>
@@ -202,9 +211,38 @@ function leave() {
         <b v-if="ability.text">{{ ability.text }}</b>
         <i v-if="n.role === 'it'" class="slash"></i>
       </div>
-      <div v-if="excluded.length" class="excl">
-        <span v-for="v in excluded" :key="v" class="ex-ico">
-          <Icon :name="VULNS[v].icon" :size="15" :stroke="2.2" /><i></i>
+      <!-- 成本每回合照付、不會變，不用顯示；有產值的才標出產值（停工時變灰） -->
+      <div
+        v-if="company && n.econ?.value"
+        class="econ"
+        :class="{ idle: !producing }"
+        :title="producing ? `每回合產值 +${n.econ.value}K` : '這回合停工：沒有產值（成本照付）'"
+      >
+        <b class="v">+{{ n.econ.value }}K</b>
+      </div>
+      <!-- 狀態（被入侵、癱瘓、隔離…）放在卡片左上角，跟右上角的產值一樣凸出卡外，不擠標題列 -->
+      <div class="status">
+        <span v-if="company && n.controlled" class="pill ctrl hacked" :title="cFrozen ? 'IT 被癱瘓或控制，奪回暫停中' : `約 ${recapEta} 回合後公司奪回`">
+          被入侵<span class="eta" :key="recapEta">
+            <Icon :name="cFrozen ? 'snowflake' : 'timer'" :size="14" :stroke="2.6" />{{ cFrozen ? '' : recapEta }}
+          </span>
+        </span>
+        <span v-else-if="n.controlled" class="pill ctrl" title="公司奪回的倒數">
+          已控制<span class="eta" :key="recapEta">
+            <Icon :name="cFrozen ? 'snowflake' : 'timer'" :size="14" :stroke="2.6" />{{ cFrozen ? '' : recapEta }}
+          </span>
+        </span>
+        <span v-if="n.paralyzed > 0" class="pill para">
+          <Icon name="snowflake" :size="14" :stroke="2.6" />癱瘓
+          <template v-if="n.role === 'it' || company"> {{ n.paralyzed }} 回</template>
+          <span v-else class="eta" :key="restoreEta">
+            <Icon :name="restorePaused ? 'snowflake' : 'timer'" :size="14" :stroke="2.6" />{{ restorePaused ? '' : restoreEta }}
+          </span>
+        </span>
+        <span v-if="n.isolated" class="pill iso" :title="`離線中，${n.isolateLeft ?? 1} 回合後恢復`"><Icon name="unplug" :size="14" :stroke="2.6" />隔離 {{ n.isolateLeft ?? 1 }}</span>
+        <span v-if="n.training" class="pill train"><Icon name="graduation-cap" :size="14" :stroke="2.6" />受訓</span>
+        <span v-if="n.virus && n.controlled" class="pill virus" :class="{ paused: n.paralyzed > 0 }">
+          <Icon name="bug" :size="14" :stroke="2.6" />{{ n.paralyzed > 0 ? '病毒暫停' : '病毒' }}
         </span>
       </div>
     </div>
@@ -218,15 +256,16 @@ function leave() {
         :class="['st-' + s.state, 'k-' + s.kind, s.fx ? 'sfx-' + s.fx : '', { sealed: s.state === 'hidden' && n.sealed }]"
       >
         <template v-if="s.state === 'hidden'">
-          <span class="q">{{ n.sealed ? '—' : '?' }}</span>
+          <span class="q">{{ n.sealed && !company ? '—' : '?' }}</span>
         </template>
         <template v-else>
           <Icon :name="s.icon" :size="20" :stroke="2.3" class="sic" />
           <span class="sname">{{ s.name }}</span>
           <span
-            v-if="s.state === 'vuln' || s.state === 'struck'"
-            class="mark pub"
-            :class="{ countdown: s.eta }"
+            v-if="(s.state === 'vuln' || s.state === 'struck') && (s.pub || s.eta || company)"
+            class="mark"
+            :class="[s.pub || !company ? 'pub' : 'own', { countdown: s.eta }]"
+            :title="eyeTitle(s)"
           >
             <Icon name="eye" :size="15" :stroke="2.6" />
             <template v-if="s.eta">
@@ -313,6 +352,52 @@ function leave() {
   --kc: var(--k-data);
 }
 
+.econ {
+  position: absolute;
+  right: -8px;
+  top: -19px;
+  z-index: 2;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px 4px;
+  border-radius: 17px;
+  font-family: var(--font-num);
+  font-size: 18px;
+  background: #1a2231;
+  border: 2px solid #5a6b8c;
+}
+.econ b {
+  padding: 0 5px;
+  border-radius: 12px;
+  line-height: 1.35;
+}
+.econ .v {
+  color: #fff;
+  background: #2c8f66;
+}
+.econ.idle .v {
+  color: #6d7a8e;
+  background: #dfe5ec;
+  text-decoration: line-through;
+}
+.econ .c {
+  color: #ffd0c8;
+}
+.pill.ctrl.hacked {
+  background: #b23a2c;
+  border-color: #ff9a8c;
+}
+.pill.iso {
+  background: #4a5568;
+  border: 1.5px solid #b5c1d6;
+}
+.pill.train {
+  background: #3b8a52;
+  border: 1.5px solid var(--good2);
+}
+.aimable {
+  cursor: pointer;
+}
 .head {
   position: relative;
   display: flex;
@@ -363,7 +448,7 @@ function leave() {
 .name {
   font-size: 22px;
   font-weight: 900;
-  line-height: 1.15;
+  line-height: 1.32;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -451,11 +536,26 @@ function leave() {
   box-shadow: 0 0 0 2px #1a2231;
 }
 .excl {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.status {
   position: absolute;
-  right: 8px;
-  bottom: 6px;
+  left: -8px;
+  top: -22px;
+  z-index: 2;
   display: flex;
   gap: 4px;
+  pointer-events: auto;
+}
+.status:empty {
+  display: none;
+}
+.status .pill {
+  font-size: 17px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 .ex-ico {
   position: relative;
@@ -583,6 +683,10 @@ function leave() {
 }
 .mark.pub {
   background: #c8402f;
+}
+/* 公司自己偵查到的：綠色眼睛，駭客看不到 */
+.mark.own {
+  background: #2c8f66;
 }
 .mark.fix {
   background: #3d6fa8;
@@ -1185,7 +1289,9 @@ function leave() {
   }
   .slot .sic,
   .mark.pub > :first-child,
-  .mark.pub:not(.countdown) {
+  .mark.pub:not(.countdown),
+  .mark.own > :first-child,
+  .mark.own:not(.countdown) {
     display: none;
   }
   .mark {

@@ -56,6 +56,8 @@ const DEFAULT_TARGET: Partial<Record<CardId, string>> = {
   inject: 'ai',
   skill: 'ai',
   ally: 'ai',
+  alarm: 'it',
+  wipe: 'backup',
 }
 
 function predict(s: GameState, id: CardId, target?: string) {

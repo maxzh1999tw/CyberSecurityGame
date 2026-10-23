@@ -43,7 +43,7 @@ const goals = computed(() => (game.s ? missionGoals(game.s) : []))
 .tag {
   padding: 5px 0;
   text-align: center;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
   letter-spacing: 6px;
   text-indent: 6px;

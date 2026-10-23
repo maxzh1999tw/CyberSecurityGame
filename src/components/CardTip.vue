@@ -54,7 +54,7 @@ const info = computed(() => {
 .state {
   padding: 7px 12px;
   border-radius: 10px;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 900;
   text-align: center;
   color: #fff;
@@ -77,13 +77,13 @@ const info = computed(() => {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
 }
 .trivia b {
-  font-size: 15px;
+  font-size: 17px;
   letter-spacing: 4px;
   color: var(--gold2);
 }
 .trivia p {
   margin: 6px 0 0;
-  font-size: 17px;
+  font-size: 19px;
   line-height: 1.6;
   font-weight: 500;
   color: #e3ebf8;

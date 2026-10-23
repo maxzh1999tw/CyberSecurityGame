@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { backToMenu, startGame, toggleFullscreen, toggleMute, ui } from '../game/store'
+import { restartCompany } from '../game/companyStore'
+import { backToMenu, game, startGame, toggleFullscreen, toggleMute, ui } from '../game/store'
 import Icon from './Icon.vue'
 
 function restart() {
   ui.menuOpen = false
-  startGame()
+  if (game.s?.mode === 'company') restartCompany()
+  else startGame()
 }
 function home() {
   ui.menuOpen = false

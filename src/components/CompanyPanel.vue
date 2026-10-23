@@ -2,7 +2,7 @@
 // 右欄：公司的反應（反應速度、IT 管理員狀態、所有進行中的倒數）
 import { computed } from 'vue'
 import { SCENARIOS, VULNS } from '../game/data'
-import { alertZone, infras, node, speedOf, upcoming } from '../game/engine'
+import { alertZone, infras, its, node, speedOf, upcoming } from '../game/engine'
 import { game } from '../game/store'
 import Icon from './Icon.vue'
 
@@ -17,7 +17,8 @@ const ZONE = [
 const zone = computed(() => alertZone(s.value.alert))
 const speed = computed(() => speedOf(s.value))
 
-const it = computed(() => node(s.value, 'it'))
+// 駭客模式每間公司只有一位 IT
+const it = computed(() => its(s.value)[0])
 // 任一套基礎設施中斷，公司就無法應變
 const downInfra = computed(() => infras(s.value).find((n) => n.paralyzed > 0) ?? null)
 const blockState = computed(() => {
@@ -138,7 +139,7 @@ const total = computed(() => upcoming(s.value).length)
   white-space: nowrap;
 }
 .names span {
-  font-size: 16px;
+  font-size: 18px;
   color: var(--text2);
 }
 
@@ -164,7 +165,7 @@ const total = computed(() => upcoming(s.value).length)
   line-height: 1.3;
 }
 .rt span {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text2);
 }
@@ -213,13 +214,13 @@ const total = computed(() => upcoming(s.value).length)
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 900;
   letter-spacing: 5px;
   color: var(--text2);
 }
 .title small {
-  font-size: 14px;
+  font-size: 16px;
   letter-spacing: 0;
   font-weight: 700;
   color: var(--text3);
@@ -231,7 +232,7 @@ const total = computed(() => upcoming(s.value).length)
   min-height: 52px;
   padding: 4px 10px;
   border-radius: 9px;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   color: #fff;
   background: #3a2e2a;
@@ -257,16 +258,16 @@ const total = computed(() => upcoming(s.value).length)
   min-width: 0;
   display: flex;
   flex-direction: column;
-  line-height: 1.25;
+  line-height: 1.35;
 }
 .lb b {
-  font-size: 17px;
+  font-size: 19px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .lb small {
-  font-size: 13.5px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text2);
 }
@@ -301,7 +302,7 @@ const total = computed(() => upcoming(s.value).length)
 }
 .empty {
   padding: 8px 4px;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--text3);
 }
 </style>

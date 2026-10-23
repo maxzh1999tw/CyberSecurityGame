@@ -2,94 +2,14 @@
 //   node scripts/sim.ts 100            → 每種組合跑 100 局
 //   node scripts/sim.ts 1 show ransom  → 印出幾局「路線被封死」的過程
 //   NO_SUPPORT=1 node scripts/sim.ts 100 → 牌堆不放資源管理牌（看它們對勝率的影響）
+import { botNextAction } from '../src/game/bot.ts'
 import { CARDS, CARD_IDS } from '../src/game/data.ts'
-import {
-  CARD_COPIES,
-  HAND_MAX,
-  cardCost,
-  endOfTurn,
-  newGame,
-  node,
-  playCard,
-  playability,
-  recaptureSpeedOf,
-  recycleCard,
-  routeExists,
-  startHackerTurn,
-} from '../src/game/engine.ts'
+import { CARD_COPIES, endOfTurn, newGame, playCard, recycleCard, routeExists, startHackerTurn } from '../src/game/engine.ts'
 import type { CardId, GameState, MissionId, ScenarioId } from '../src/game/types.ts'
 
 if (process.env.NO_SUPPORT) for (const id of CARD_IDS) if (CARDS[id].cat === 'support') CARD_COPIES[id] = 0
 // OFF=energy,proxy → 只拿掉指定的牌
 for (const id of (process.env.OFF ?? '').split(',').filter(Boolean)) CARD_COPIES[id as CardId] = 0
-
-interface Choice {
-  uid: number
-  id: CardId
-  target?: string
-  score: number
-}
-
-function bestChoice(s: GameState): Choice | null {
-  let best: Choice | null = null
-  const seen = new Set<CardId>()
-  for (const c of s.hand) {
-    if (seen.has(c.id)) continue
-    seen.add(c.id)
-    const def = CARDS[c.id]
-    const pb = playability(s, c.id)
-    if (!pb.affordable || pb.status === 'dead') continue
-    const options: Array<{ target?: string; tri: 'Y' | 'M' }> = []
-    if (def.targeting === 'node') {
-      for (const [nid, tri] of Object.entries(pb.targets)) options.push({ target: nid, tri: tri as 'Y' | 'M' })
-    } else {
-      options.push({ tri: pb.autoTri as 'Y' | 'M' })
-    }
-    for (const o of options) {
-      if (s.ap < cardCost(s, c.id, o.target)) continue
-      let sc = 0
-      const noise = def.noise
-      const room = 9 - s.alert
-      if (def.cat === 'finish') {
-        sc = o.tri === 'Y' ? 1000 : 200
-      } else if (def.cat === 'action') {
-        sc = o.tri === 'Y' ? 100 - noise * 6 : s.alert <= 3 && noise <= 2 ? 30 - noise * 8 : 0
-        if (c.id === 'lateral' && o.tri === 'M') sc -= 10
-        // 已控制的目標快被奪回時才延長，避免電腦玩家反覆續控而不推進任務。
-        const target = o.target ?? null
-        if (c.id !== 'lateral' && target && node(s, target).controlled) {
-          const n = node(s, target)
-          sc = o.tri === 'Y' && n.timer <= 2 * recaptureSpeedOf(s, n) ? 55 - noise * 6 : 0
-        }
-      } else if (def.cat === 'paralyze') {
-        const needWipe = s.mission === 'ransom' && c.id === 'wipe'
-        const needAlarm = s.mission === 'sabotage' && c.id === 'alarm'
-        sc = needWipe || needAlarm ? (o.tri === 'Y' ? 70 : 0) : c.id === 'alarm' ? (s.alert >= 4 ? 40 : 0) : 0
-      } else if (def.cat === 'support') {
-        // 資源管理牌：警戒高才降警戒；手牌少才抽牌；熬夜趕工是免費的行動點
-        const a = s.alert
-        sc =
-          c.id === 'wipelog' ? (a >= 5 ? 55 : a >= 3 ? 20 : 0)
-          : c.id === 'proxy' ? (a >= 6 ? 60 : a >= 4 ? 25 : 0)
-          : c.id === 'darkweb' ? (s.hand.length <= 6 ? 22 : 0)
-          : c.id === 'energy' ? 60
-          : c.id === 'stash' ? (s.ap >= 3 ? 12 : 0)
-          : 0
-      } else {
-        sc = ({ osint: 45, smooth: 28, ally: 26, scan: s.alert <= 2 ? 24 : 0, virus: 30 } as Record<string, number>)[c.id] ?? 20
-        if (c.id === 'osint' && o.target) {
-          const n = node(s, o.target)
-          sc += n.layer === 0 ? 5 : 0
-        }
-      }
-      if (def.cat !== 'finish' && noise > room) sc -= 100
-      if (sc <= 0) continue
-      sc -= pb.cost
-      if (!best || sc > best.score) best = { uid: c.uid, id: c.id, target: o.target, score: sc }
-    }
-  }
-  return best
-}
 
 const NL = String.fromCharCode(10)
 
@@ -113,21 +33,11 @@ function playGame(seed: number, scenario: ScenarioId, mission?: MissionId, log?:
   while (s.phase !== 'over' && guard++ < 300) {
     let acts = 0
     while (s.phase === 'hacker' && acts++ < 20) {
-      const ch = bestChoice(s)
-      if (!ch) {
-        // 死牌優先換掉；滿手又沒有值得出的牌時，也能換掉暫時不需要的續控牌。
-        const dead = s.hand.filter((c) => {
-          const d = CARDS[c.id]
-          return playability(s, c.id).status === 'dead' && d.cat !== 'finish'
-        })
-        const replace = dead.length >= 2
-          ? dead[0]
-          : s.hand.length >= HAND_MAX ? s.hand.find((c) => CARDS[c.id].cat !== 'finish') : undefined
-        if (replace && s.ap >= 1) {
-          recycleCard(s, replace.uid)
-          continue
-        }
-        break
+      const ch = botNextAction(s)
+      if (ch.kind === 'end') break
+      if (ch.kind === 'recycle') {
+        recycleCard(s, ch.uid)
+        continue
       }
       const r = playCard(s, ch.uid, ch.target)
       log?.push(

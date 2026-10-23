@@ -5,6 +5,7 @@ import MainMenu from './components/MainMenu.vue'
 import QuizScreen from './components/QuizScreen.vue'
 import ReviewScreen from './components/ReviewScreen.vue'
 import MobileOrientation from './components/MobileOrientation.vue'
+import RecruitScreen from './components/RecruitScreen.vue'
 import { fitStage, game, view } from './game/store'
 
 // 使用可見的 CSS viewport。行動裝置模擬或瀏覽器工具列可能令
@@ -47,6 +48,7 @@ onBeforeUnmount(() => {
     <MainMenu v-if="game.screen === 'menu'" />
     <GameScreen v-else-if="game.screen === 'game'" />
     <QuizScreen v-else-if="game.screen === 'quiz'" />
+    <RecruitScreen v-else-if="game.screen === 'draft'" />
     <ReviewScreen v-else />
   </div>
   <MobileOrientation />

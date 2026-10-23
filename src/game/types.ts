@@ -184,6 +184,8 @@ export interface Slot {
   fixed: boolean
   /** 公開的弱點：公司修復的倒數（回合） */
   timer?: number
+  /** 公司模式：公司自己稽核過、知道這張牌是什麼（駭客看不到） */
+  known?: boolean
 }
 
 export interface Entry {
@@ -215,6 +217,32 @@ export interface GameNode {
   virus: boolean
   /** 駭客已確認「不存在」的弱點 */
   excluded: Partial<Record<VulnId, true>>
+  /** 公司模式：經營數值（駭客模式沒有） */
+  econ?: NodeEcon
+  /** 公司模式：被隔離離線（駭客不能對它出牌，它也不發揮作用） */
+  isolated?: boolean
+  /** 公司模式：隔離還剩幾回合（每個公司回合開始時減 1） */
+  isolateLeft?: number
+  /** 公司模式：解除隔離後，第幾個公司回合起才能再隔離 */
+  isolateReady?: number
+  /** 公司模式：公司用修補牌猜過、確定這個節點沒有的弱點 */
+  cleared?: VulnId[]
+  /** 公司模式：正在教育訓練（這個公司回合停工） */
+  training?: boolean
+}
+
+/** 公司模式的招募種類 */
+export type HireKind = 'staff' | 'exec' | 'ai' | 'it' | 'infra' | 'db' | 'backup'
+/** 1 菜鳥／破爛、2 資深／標準、3 王牌／頂規 */
+export type Tier = 1 | 2 | 3
+
+export interface NodeEcon {
+  hire: HireKind
+  tier: Tier
+  /** 每回合薪水或維護費 */
+  cost: number
+  /** 每回合產值（防守節點為 0） */
+  value: number
 }
 
 export interface CardInst {
@@ -233,6 +261,10 @@ export interface PlayLogEntry {
 }
 
 export interface GameState {
+  /** 沒寫就是原本的駭客模式 */
+  mode?: 'hacker' | 'company'
+  /** 公司模式：公司方的經營狀態 */
+  company?: CompanyState
   rng: number
   uidSeq: number
   scenario: ScenarioId
@@ -267,4 +299,104 @@ export interface GameState {
   patched: number
   recaptured: number
   noiseTotal: number
+}
+
+// ───────────────────────── 公司模式 ─────────────────────────
+
+export type CompanyCardId =
+  // 稽核
+  | 'audit'
+  | 'pentest'
+  | 'vulnscan'
+  | 'intel'
+  // 修補與強化
+  | 'patch'
+  | 'training'
+  | 'upgrade'
+  | 'replace'
+  | 'fixLegacy'
+  | 'fixWeakpw'
+  | 'fixBuggy'
+  | 'fixKind'
+  | 'fixGullible'
+  | 'fixCurious'
+  | 'fixSamepw'
+  | 'aiReview'
+  // 應變
+  | 'recapture'
+  | 'isolate'
+  | 'lockout'
+  | 'monitor'
+  | 'failover'
+  | 'restoreDrill'
+  // 經營與救急
+  | 'overtime'
+  | 'invest'
+  | 'marketing'
+  | 'promo'
+  | 'insurance'
+  | 'pr'
+  // 抽牌
+  | 'execCoach'
+
+export type CompanyCardCat = 'audit' | 'harden' | 'respond' | 'business'
+
+export interface CompanyCardDef {
+  id: CompanyCardId
+  name: string
+  cat: CompanyCardCat
+  cost: number
+  icon: string
+  /** 什麼情況才能打（跟駭客的牌一樣，弱點用 {v:id} 標籤） */
+  cond?: string
+  effect: string
+  /** 要指定哪種節點（沒寫就是不用選目標） */
+  target?: 'any' | 'person' | 'machine' | 'ai' | 'db' | 'backup' | 'infra' | 'controlled' | 'controlledPerson'
+  trivia: string
+}
+
+export interface CompanyCardInst {
+  uid: number
+  id: CompanyCardId
+}
+
+/** 公司方玩家自己取的公司名稱與 logo */
+export interface CompanyBrand {
+  name: string
+  /** logo 圖示名稱 */
+  logo: string
+  /** logo 底色 */
+  color: string
+}
+
+export interface CompanyState {
+  /** 公司名稱與 logo */
+  brand: CompanyBrand
+  /** 資產（K）；最低 0 */
+  assets: number
+  /** 本回合已經花在牌上的成本 */
+  spent: number
+  /** 本回合額外收入（加班趕工等） */
+  bonus: number
+  hand: CompanyCardInst[]
+  deck: CompanyCardInst[]
+  discard: CompanyCardInst[]
+  /** 公司回合數 */
+  turn: number
+  /** 已經用威脅情資看見駭客任務 */
+  missionKnown: boolean
+  /** 自動化監控：下個駭客回合每張有噪音的牌噪音 +N */
+  monitor: number
+  /** 資安保險：下次節點被控制時理賠 */
+  insurance: boolean
+  /** 拉攏投資的還款：每回合營收 −amount，還剩幾回合 */
+  debts: Array<{ amount: number; turns: number }>
+  /** 這局怎麼結束的 */
+  outcome: 'perfect' | 'caught' | 'blocked' | 'breached' | null
+  /** 駭客每回合多拿的行動點 */
+  hackerAp: number
+  /** 每回合抽幾張：開業時就固定，員工之後被癱瘓、控制、隔離都不會改變 */
+  drawPerTurn: number
+  /** 這回合還剩幾次免費換牌（手牌滿了抽不到牌時給的補償） */
+  freeSwaps: number
 }

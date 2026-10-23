@@ -234,11 +234,15 @@ export const infraCtrl = (s: GameState) => infras(s).some((n) => n.controlled)
 export const aiCtrl = (s: GameState) => ais(s).some((n) => n.controlled)
 export const execCtrl = (s: GameState) => s.nodes.some((n) => isExec(n) && n.controlled)
 const roleCtrl = (s: GameState, role: GameNode['role']) => s.nodes.some((n) => n.role === role && n.controlled)
-/** IT 被控制或癱瘓，公司無法應變 */
-const itDown = (s: GameState) => {
-  const it = node(s, 'it')
-  return it.controlled || it.paralyzed > 0
-}
+/** IT、資料庫、備份：公司模式可能各有好幾個；駭客模式各一個 */
+export const its = (s: GameState) => s.nodes.filter((n) => n.role === 'it')
+export const dbs = (s: GameState) => s.nodes.filter((n) => n.role === 'db')
+export const backups = (s: GameState) => s.nodes.filter((n) => n.role === 'backup')
+const itCtrl = (s: GameState) => its(s).some((n) => n.controlled)
+/** 所有 IT 都被控制或癱瘓，公司才無法應變 */
+const itDown = (s: GameState) => its(s).every((n) => n.controlled || n.paralyzed > 0)
+/** 資料分散：所有資料庫都被控制，才算拿到公司的資料 */
+const allDbCtrl = (s: GameState) => dbs(s).every((n) => n.controlled)
 
 /** 外圍可直接偵查；控制某層會開放下一層，控制更深的層也會讓外面的層保持開放。 */
 export function canRecon(s: GameState, n: GameNode): boolean {
@@ -247,9 +251,10 @@ export function canRecon(s: GameState, n: GameNode): boolean {
 
 /** 依畫面方向擴散：同層或下方一層（核心 → 內網 → 外圍），不能向上。 */
 function lateralCandidates(s: GameState, source: GameNode): GameNode[] {
-  if (!source.controlled) return []
+  // 公司模式：被隔離的節點離線，不能當擴散的來源，也不會被擴散到
+  if (!source.controlled || source.isolated) return []
   return s.nodes.filter(
-    (n) => !n.controlled && (n.layer === source.layer || n.layer === source.layer - 1),
+    (n) => !n.controlled && !n.isolated && (n.layer === source.layer || n.layer === source.layer - 1),
   )
 }
 
@@ -259,11 +264,16 @@ export function alertZone(a: number): 0 | 1 | 2 {
 
 /** 公司反應速度：警戒值越高，倒數走得越快 */
 export const speedOf = (s: GameState): number => ZONE_SPEED[alertZone(s.alert)]
+/** 弱點修補倒數的速度（公司模式跟駭客模式一樣） */
+export const repairSpeedOf = (s: GameState): number => speedOf(s)
 
-/** 備份受控、癱瘓或有未修補的「破釜沉舟」時，視為備份不可用。 */
+/** 這個備份受控、癱瘓或有未修補的「破釜沉舟」時，視為不可用。 */
+const backupDown = (b: GameNode, H: Has = trueHas): Tri =>
+  or(yn(b.controlled), yn(b.paralyzed > 0), yn(!!b.isolated), H(b, 'nobackup'))
+
+/** 所有備份都不可用，公司才救不回資料。 */
 export function backupUnavailable(s: GameState): boolean {
-  const backup = node(s, 'backup')
-  return backup.controlled || backup.paralyzed > 0 || effective(backup, 'nobackup')
+  return backups(s).every((b) => backupDown(b) === 'Y')
 }
 
 /** 奪回計時速度；備份不可用時，IT、基礎設施與資料庫的計時減半。 */
@@ -306,7 +316,9 @@ export function reachKnown(s: GameState, n: GameNode): Tri {
 
 /** 指定目標前必須確認入口；未知捷徑不能繞過畫面上的鎖。 */
 function hasTargetAccess(s: GameState, id: CardId, t: GameNode | null): boolean {
-  return CARDS[id].targeting !== 'node' || (!!t && reachKnown(s, t) === 'Y')
+  if (CARDS[id].targeting !== 'node') return true
+  // 公司模式：被隔離的節點離線，駭客不能對它出牌
+  return !!t && !t.isolated && reachKnown(s, t) === 'Y'
 }
 
 /** 能接觸到的員工，才能利用未鎖螢幕植入 USB 載荷，或請他幫忙刷門禁。 */
@@ -347,15 +359,12 @@ function reachUsed(s: GameState, n: GameNode): Entry[] {
 
 // ───────────────────────── 牌的條件 ─────────────────────────
 
+/** 不用選目標的牌，畫面上主要影響哪個節點（勒索、外送影響第一個資料庫） */
 function implicitTarget(s: GameState, id: CardId): GameNode | null {
   switch (id) {
     case 'ransom':
     case 'exfil':
-      return node(s, 'db')
-    case 'alarm':
-      return node(s, 'it')
-    case 'wipe':
-      return node(s, 'backup')
+      return dbs(s)[0] ?? null
     default:
       return null
   }
@@ -363,8 +372,6 @@ function implicitTarget(s: GameState, id: CardId): GameNode | null {
 
 /** 這張牌的條件在某個「視角」下成立嗎 */
 export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null): Tri {
-  const db = node(s, 'db')
-  const backup = node(s, 'backup')
   switch (id) {
     case 'ally':
       return t && isAi(t) && canRecon(s, t) ? 'Y' : 'N'
@@ -393,7 +400,7 @@ export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null):
     case 'exploit':
       return t ? and(reach(s, H, t), or(H(t, 'buggy'), H(t, 'legacy'))) : 'N'
     case 'inject':
-      return t && isAi(t) ? and(reach(s, H, t), or(yn(node(s, 'it').controlled), H(t, 'obey'), H(t, 'nohuman'))) : 'N'
+      return t && isAi(t) ? and(reach(s, H, t), or(yn(itCtrl(s)), H(t, 'obey'), H(t, 'nohuman'))) : 'N'
     case 'skill':
       return t && isAi(t) ? and(reach(s, H, t), or(yn(empCtrl(s)), H(t, 'selfupd'))) : 'N'
     case 'usb':
@@ -403,21 +410,20 @@ export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null):
     case 'lateral':
       return t && lateralCandidates(s, t).length > 0 ? 'Y' : 'N'
     case 'alarm':
-      return and(yn(infraCtrl(s)), yn(nonItEmpCtrl(s)))
+      return t && t.role === 'it' ? and(yn(infraCtrl(s)), yn(nonItEmpCtrl(s))) : 'N'
     case 'wipe':
-      return and(yn(infraCtrl(s)), yn(node(s, 'it').controlled || db.controlled))
+      return t && t.role === 'backup'
+        ? and(yn(infraCtrl(s)), yn(itCtrl(s) || dbs(s).some((n) => n.controlled)))
+        : 'N'
     case 'ransom':
-      return and(
-        yn(db.controlled),
-        or(yn(backup.controlled), yn(backup.paralyzed > 0), H(backup, 'nobackup')),
-      )
+      return and(yn(allDbCtrl(s)), ...backups(s).map((b) => backupDown(b, H)))
     case 'bec':
       return t
         ? and(yn(execCtrl(s)), yn(infraCtrl(s)), H(t, 'gullible'))
         : 'N'
     case 'exfil':
       return s.mission === 'insiderleak'
-        ? and(yn(empCtrl(s)), yn(db.controlled))
+        ? and(yn(empCtrl(s)), yn(allDbCtrl(s)))
         : 'N'
     case 'wreck':
       return t && isInfra(t) ? and(yn(t.controlled), yn(itDown(s))) : 'N'
@@ -433,7 +439,6 @@ export function condition(s: GameState, H: Has, id: CardId, t: GameNode | null):
 
 /** 條件裡「弱點存不存在」這一類的檢查點（失敗時用來推論「確定不存在」） */
 function tested(s: GameState, id: CardId, t: GameNode | null): Array<[GameNode, VulnId]> {
-  const backup = node(s, 'backup')
   switch (id) {
     case 'smooth':
       return t && isEmployee(t) ? [[t, 'gullible'], [t, 'oversharer']] : []
@@ -471,7 +476,7 @@ function tested(s: GameState, id: CardId, t: GameNode | null): Array<[GameNode, 
     case 'skill':
       return t ? [[t, 'selfupd']] : []
     case 'ransom':
-      return [[backup, 'nobackup']]
+      return backups(s).map((b) => [b, 'nobackup'])
     default:
       return []
   }
@@ -480,7 +485,6 @@ function tested(s: GameState, id: CardId, t: GameNode | null): Array<[GameNode, 
 /** 卡牌在公開規則上的合法性（跟駭客知道多少無關） */
 function legal(s: GameState, id: CardId, t: GameNode | null): boolean {
   if (!hasTargetAccess(s, id, t)) return false
-  const db = node(s, 'db')
   switch (id) {
     case 'scan':
       return s.nodes.some((n) => canRecon(s, n) && !n.sealed && hiddenIdx(n).length > 0)
@@ -513,13 +517,13 @@ function legal(s: GameState, id: CardId, t: GameNode | null): boolean {
       return !!t && isAi(t)
     case 'alarm':
       // 還在癱瘓中也可以再打一次，把時間延長
-      return node(s, 'it').paralyzed <= IT_PARALYZE_TURNS - 1
+      return !!t && t.role === 'it' && t.paralyzed <= IT_PARALYZE_TURNS - 1
     case 'wipe':
-      return node(s, 'backup').paralyzed === 0
+      return !!t && t.role === 'backup' && t.paralyzed === 0
     case 'ransom':
-      return db.controlled
+      return allDbCtrl(s)
     case 'exfil':
-      return s.mission === 'insiderleak' && empCtrl(s) && db.controlled
+      return s.mission === 'insiderleak' && empCtrl(s) && allDbCtrl(s)
     case 'wreck':
       return !!t && isInfra(t) && t.controlled
     case 'wipelog':
@@ -589,6 +593,8 @@ const NODE_TARGET_POOL: Partial<Record<CardId, (n: GameNode) => boolean>> = {
   ally: isAi,
   inject: isAi,
   skill: isAi,
+  alarm: (n) => n.role === 'it',
+  wipe: (n) => n.role === 'backup',
 }
 
 /** 駭客視角的預測 */
@@ -606,9 +612,9 @@ export function hintNodes(s: GameState, id: CardId): string[] {
     case 'smooth':
       return s.nodes.filter((n) => predict(s, id, n.id) !== 'N').map((n) => n.id)
     case 'ransom':
-      return ['db', 'backup']
+      return [...dbs(s), ...backups(s)].map((n) => n.id)
     case 'exfil':
-      return ['db']
+      return dbs(s).map((n) => n.id)
     case 'lateral':
       return s.nodes
         .filter((n) => n.controlled && lateralCandidates(s, n).length > 0)
@@ -698,9 +704,17 @@ function capture(
     n.controlSeq = ++s.controlSeq
     n.entry = entry
     n.timer = recaptureTurnsOf(n.role)
+    // 公司模式：資安保險在下一次節點被控制時理賠
+    if (s.company?.insurance) {
+      s.company.insurance = false
+      s.company.assets += INSURANCE_PAYOUT
+    }
   }
   revealEntries(s, entry ? [entry, ...used] : used, out)
 }
+
+/** 公司模式：資安保險的理賠金額（K） */
+export const INSURANCE_PAYOUT = 50
 
 function entryFor(s: GameState, id: CardId, t: GameNode | null): Entry | null {
   switch (id) {
@@ -721,7 +735,7 @@ function entryFor(s: GameState, id: CardId, t: GameNode | null): Entry | null {
     case 'exploit':
       return t ? preferredEntry(s, entriesOn(t, ['buggy', 'legacy'])) : null
     case 'inject':
-      if (!t || node(s, 'it').controlled) return null
+      if (!t || itCtrl(s)) return null
       return preferredEntry(s, entriesOn(t, ['obey', 'nohuman']))
     case 'skill':
       return !t || empCtrl(s) ? null : { node: t.id, vuln: 'selfupd' }
@@ -775,8 +789,6 @@ export function resolve(s: GameState, id: CardId, t: GameNode | null): Effect {
   }
   // 直接呼叫結算也不能透過失敗推論或揭露，探查尚未開放的目標。
   if (!hasTargetAccess(s, id, t)) return eff
-  const db = node(s, 'db')
-  const backup = node(s, 'backup')
   const ok = condition(s, trueHas, id, t) === 'Y'
   eff.ok = ok
   if (ok) {
@@ -878,15 +890,15 @@ export function resolve(s: GameState, id: CardId, t: GameNode | null): Effect {
         eff.captured.push(destination.id)
         break
       }
-      case 'alarm': {
-        const it = node(s, 'it')
-        it.paralyzed = IT_PARALYZE_TURNS
-        eff.paralyzed = it.id
+      case 'alarm':
+        if (!t) break
+        t.paralyzed = IT_PARALYZE_TURNS
+        eff.paralyzed = t.id
         break
-      }
       case 'wipe':
-        backup.paralyzed = BACKUP_RESTORE_TURNS
-        eff.paralyzed = backup.id
+        if (!t) break
+        t.paralyzed = BACKUP_RESTORE_TURNS
+        eff.paralyzed = t.id
         break
       case 'ransom':
       case 'bec':
@@ -914,12 +926,15 @@ export function resolve(s: GameState, id: CardId, t: GameNode | null): Effect {
         break
     }
   } else {
-    // 勒索軟體：資料庫已被控制，但備份完好 → 公司還原（順便看到備份為什麼救得回來）
-    if (id === 'ransom' && db.controlled) {
+    // 勒索軟體：資料庫都已被控制，但還有備份能用 → 公司還原（順便看到那些備份為什麼救得回來）
+    if (id === 'ransom' && allDbCtrl(s)) {
       eff.partial = true
-      backup.slots.forEach((sl, i) => {
-        if (sl.vis !== 2) eff.revealed.push(revealVuln(backup, i))
-      })
+      for (const b of backups(s)) {
+        if (backupDown(b) === 'Y') continue
+        b.slots.forEach((sl, i) => {
+          if (sl.vis !== 2) eff.revealed.push(revealVuln(b, i))
+        })
+      }
     }
     // 失敗也有收穫：看到是哪一道防護擋住了你；或是確認這個弱點不存在（搜尋類的牌不會翻出防護）
     for (const [n, v] of tested(s, id, t)) {
@@ -1010,7 +1025,8 @@ export function playCard(s: GameState, uid: number, targetId?: string): PlayResu
     return result
   }
 
-  const noise = noiseOf(s, def.noise)
+  // 公司模式的自動化監控：有噪音的牌，噪音再加上去
+  const noise = noiseOf(s, def.noise) + (def.noise > 0 ? s.company?.monitor ?? 0 : 0)
   result.noise = noise
   s.alert = Math.min(MAX_ALERT, s.alert + noise)
   s.noiseThisTurn += noise
@@ -1067,13 +1083,13 @@ export function isMissionCard(s: GameState, id: CardId): boolean {
 
 // ───────────────────────── 任務進度 ─────────────────────────
 
-/** 任務資料庫存取只在節點已受控時成立。 */
+/** 任務資料庫存取：所有資料庫都已受控才成立（資料分散）。 */
 export function dbAccess(s: GameState): boolean {
-  return node(s, 'db').controlled
+  return allDbCtrl(s)
 }
 
 export function holdNeeded(s: GameState): number {
-  if (s.mission === 'espionage') return knownHas(node(s, 'db'), 'plaintext') === 'Y' ? 1 : 2
+  if (s.mission === 'espionage') return dbs(s).some((n) => knownHas(n, 'plaintext') === 'Y') ? 1 : 2
   return 0
 }
 
@@ -1122,7 +1138,7 @@ export function startHackerTurn(s: GameState): CardInst[] {
   const carry = s.turn > 0 ? Math.min(AP_CARRY_MAX + s.carryBoost, Math.max(0, s.ap)) : 0
   s.turn += 1
   s.actedThisTurn = false
-  s.apBase = BASE_AP
+  s.apBase = BASE_AP + (s.company?.hackerAp ?? 0)
   s.apBonus = apBonusOf(s)
   s.apCarry = carry
   s.carryBoost = 0
@@ -1130,11 +1146,10 @@ export function startHackerTurn(s: GameState): CardInst[] {
   s.noiseThisTurn = 0
   s.freePlayReady = aiCtrl(s)
   s.phase = 'hacker'
-  // 任務牌已先放進手中，開局只補到 6 張；備份在之後每回合多補 1 張。
-  const backup = node(s, 'backup')
+  // 任務牌已先放進手中，開局只補到 6 張；控制任一可用的備份，之後每回合多補 1 張。
   const drawCount = s.turn === 1
     ? Math.max(0, OPENING_HAND - s.hand.length)
-    : DRAW_PER_TURN + (backup.controlled && backup.paralyzed === 0 ? 1 : 0)
+    : DRAW_PER_TURN + (backups(s).some((b) => b.controlled && b.paralyzed === 0) ? 1 : 0)
   return drawCards(s, drawCount)
 }
 
@@ -1150,15 +1165,17 @@ export type BlockReason = 'itControlled' | 'itParalyzed' | 'infraParalyzed' | nu
 
 const infraDown = (s: GameState) => infras(s).some((n) => n.paralyzed > 0)
 
+/** 所有 IT 都被癱瘓時，公司的應變才會全部停住 */
+const allItParalyzed = (s: GameState) => its(s).every((n) => n.paralyzed > 0 || !!n.isolated)
+
 export function repairBlock(s: GameState): BlockReason {
-  const it = node(s, 'it')
-  if (it.paralyzed > 0) return 'itParalyzed'
+  if (allItParalyzed(s)) return 'itParalyzed'
   if (infraDown(s)) return 'infraParalyzed'
-  if (it.controlled) return 'itControlled'
+  if (its(s).every((n) => n.controlled || n.paralyzed > 0 || !!n.isolated)) return 'itControlled'
   return null
 }
 export function recaptureBlock(s: GameState): BlockReason {
-  if (node(s, 'it').paralyzed > 0) return 'itParalyzed'
+  if (allItParalyzed(s)) return 'itParalyzed'
   return infraDown(s) ? 'infraParalyzed' : null
 }
 
@@ -1180,9 +1197,10 @@ export function upcoming(s: GameState): Upcoming[] {
   const out: Upcoming[] = []
   for (const n of s.nodes) {
     n.slots.forEach((sl, i) => {
-      if (sl.shield || sl.fixed || sl.vis !== 2 || sl.timer === undefined) return
+      if (sl.shield || sl.fixed || sl.timer === undefined) return
+      if (sl.vis !== 2 && !(s.mode === 'company' && sl.known)) return
       if (!effective(n, sl.vuln)) return
-      out.push({ kind: 'repair', node: n.id, idx: i, vuln: sl.vuln, eta: etaOf(sl.timer, speed), frozen: rb })
+      out.push({ kind: 'repair', node: n.id, idx: i, vuln: sl.vuln, eta: etaOf(sl.timer, repairSpeedOf(s)), frozen: rb })
     })
     if (n.role === 'backup' && n.paralyzed > 0) {
       out.push({ kind: 'restore', node: n.id, idx: -1, vuln: null, eta: etaOf(n.paralyzed, speed), frozen: rb })
@@ -1210,6 +1228,7 @@ export interface RepairStep {
 }
 export interface RestoreStep {
   t: 'restore'
+  node: string
 }
 export interface RecaptureStep {
   t: 'recapture'
@@ -1240,6 +1259,11 @@ export interface EndStep {
 export type StepOutcome = RepairStep | RestoreStep | RecaptureStep | FrozenStep | StandingStep | CooldownStep | EndStep
 
 /** 奪回節點：回到未控制，而且當初入侵用的弱點會被修補 */
+/** 公司模式：公司出牌奪回節點（修補駭客當初的入口） */
+export function recaptureNode(s: GameState, n: GameNode): SlotRef | null {
+  return recapture(s, n)
+}
+
 function recapture(s: GameState, n: GameNode): SlotRef | null {
   n.controlled = false
   n.virus = false
@@ -1270,13 +1294,14 @@ export function canEndTurn(s: GameState): boolean {
 export function* endOfTurn(s: GameState): Generator<StepOutcome, void, void> {
   if (!canEndTurn(s)) return
   s.phase = 'company'
+  // 公司模式：已知弱點一樣會倒數修好、被控制的節點一樣會倒數奪回（公司方可以出牌立刻處理）；備份復原只能靠公司出牌
+  const auto = s.mode !== 'company'
   const speed = speedOf(s)
   // 所有節點採用回合開始時同一份備份狀態快照；即使本回合先恢復或奪回備份，
   // 也不會因節點陣列順序改變其他節點的計時速度。
   const recaptureSpeeds = new Map(s.nodes.map((n) => [n.id, recaptureSpeedOf(s, n)] as const))
   const rb = repairBlock(s)
   const cb = recaptureBlock(s)
-  const it = node(s, 'it')
 
   // 公司被卡住：倒數暫停
   const ups = upcoming(s)
@@ -1286,14 +1311,16 @@ export function* endOfTurn(s: GameState): Generator<StepOutcome, void, void> {
     yield { t: 'frozen', reason: (rb ?? cb)!, both: cb !== null }
   }
 
-  // 修復公開的弱點
+  // 修復公開的弱點（公司模式：公司自己稽核到的也算，修得比較慢）
   if (!rb) {
+    const repairSpeed = repairSpeedOf(s)
     const done: Array<{ n: GameNode; i: number }> = []
     for (const n of s.nodes) {
       n.slots.forEach((sl, i) => {
-        if (sl.shield || sl.fixed || sl.vis !== 2 || sl.timer === undefined) return
+        if (sl.shield || sl.fixed || sl.timer === undefined) return
+        if (sl.vis !== 2 && !(s.mode === 'company' && sl.known)) return
         if (!effective(n, sl.vuln)) return
-        sl.timer -= speed
+        sl.timer -= repairSpeed
         if (sl.timer <= EPS) done.push({ n, i })
       })
     }
@@ -1303,13 +1330,15 @@ export function* endOfTurn(s: GameState): Generator<StepOutcome, void, void> {
       s.patched += 1
       yield { t: 'repair', node: n.id, idx: i, vuln: sl.vuln, name: repairName(sl.vuln) }
     }
+  }
+  if (auto && !rb) {
     // 備份復原
-    const b = node(s, 'backup')
-    if (b.paralyzed > 0) {
+    for (const b of backups(s)) {
+      if (b.paralyzed <= 0) continue
       b.paralyzed -= speed
       if (b.paralyzed <= EPS) {
         b.paralyzed = 0
-        yield { t: 'restore' }
+        yield { t: 'restore', node: b.id }
       }
     }
   }
@@ -1339,9 +1368,10 @@ export function* endOfTurn(s: GameState): Generator<StepOutcome, void, void> {
   }
   yield { t: 'standing', revealed, from }
 
-  // IT 與基礎設施的中斷固定按回合恢復，不受暫停修復影響。
-  if (it.paralyzed > 0) it.paralyzed -= 1
-  for (const infra of infras(s)) if (infra.paralyzed > 0) infra.paralyzed -= 1
+  // IT 與基礎設施的中斷固定按回合恢復，不受暫停修復影響；公司模式的備份也按回合恢復。
+  for (const n of [...its(s), ...infras(s), ...(auto ? [] : backups(s))]) if (n.paralyzed > 0) n.paralyzed -= 1
+  // 自動化監控只維持一個駭客回合
+  if (s.company) s.company.monitor = 0
 
   // 冷卻
   let delta = 0
@@ -1355,7 +1385,7 @@ export function* endOfTurn(s: GameState): Generator<StepOutcome, void, void> {
   if (holdCheck(s)) {
     s.phase = 'over'
     s.result = 'win'
-  } else if (isStuck(s)) {
+  } else if (auto && isStuck(s)) {
     s.phase = 'over'
     s.result = 'lose'
     s.loseReason = '公司補好了你需要的弱點，攻擊路線被封死了'
@@ -1628,6 +1658,8 @@ export interface NewGameOptions {
   seed?: number
   scenario?: ScenarioId
   mission?: MissionId
+  /** 公司模式：招募、擺放好的節點（不用公司情境的固定配置） */
+  nodes?: GameNode[]
 }
 
 /** 起手保留偵查與入侵選擇；只看公開可行性，不用暗牌答案保證攻擊成功。 */
@@ -1697,12 +1729,17 @@ export function newGame(opts: NewGameOptions = {}): GameState {
   }
   s.mission = opts.mission ?? pick(s, MISSION_IDS)
   const layout = SCENARIOS[s.scenario].layout
-  for (const t of layout) {
-    s.nodes.push(newNode(t, drawSlots(s, s.scenario, t.kind, t.role, t.draw)))
+  if (opts.nodes) {
+    s.mode = 'company'
+    s.nodes = opts.nodes
+  } else {
+    for (const t of layout) {
+      s.nodes.push(newNode(t, drawSlots(s, s.scenario, t.kind, t.role, t.draw)))
+    }
   }
   ensureSolvable(s)
-  // 還是無解（例如「假老闆詐騙」需要同時湊齊兩個條件）：整副重抽
-  for (let a = 0; a < 40 && !routeExists(s); a++) {
+  // 還是無解（例如「假老闆詐騙」需要同時湊齊兩個條件）：整副重抽（公司模式的牌是招募來的，不重抽）
+  for (let a = 0; a < 40 && !opts.nodes && !routeExists(s); a++) {
     for (const n of s.nodes) {
       const t = layout.find((x) => x.id === n.id)!
       n.slots = drawSlots(s, s.scenario, t.kind, t.role, t.draw)

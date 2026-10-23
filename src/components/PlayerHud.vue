@@ -3,6 +3,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { RECYCLE_COST, canEndTurn as engineCanEndTurn, canRecycle, isMissionCard } from '../game/engine'
 import { boardCenter, endTurn, game, nodeRect, playerHasMoves, registerAnchor, ui, view } from '../game/store'
+import type { CardId } from '../game/types'
 import Icon from './Icon.vue'
 
 const s = computed(() => game.s!)
@@ -17,7 +18,7 @@ const noMoves = computed(() => activeTurn.value && !playerHasMoves(s.value))
 const nudgeRecycle = computed(() => noMoves.value && canRecycle(s.value))
 const suggest = computed(() => canEnd.value && noMoves.value && !nudgeRecycle.value)
 const dragging = computed(() => !!ui.drag && ui.drag.moved)
-const protectedCard = computed(() => !!ui.drag && isMissionCard(s.value, ui.drag.id))
+const protectedCard = computed(() => !!ui.drag && isMissionCard(s.value, ui.drag.id as CardId))
 const recyclable = computed(() => dragging.value && !protectedCard.value && canRecycle(s.value))
 const overPile = computed(() => dragging.value && !!ui.drag?.overPile)
 const canRecycleNow = computed(() => activeTurn.value && canRecycle(s.value))
@@ -252,7 +253,7 @@ watch(
   gap: 6px;
   padding: 4px 14px 4px 10px;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
   color: #fff;
   background: var(--good);
@@ -310,7 +311,7 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   white-space: nowrap;
 }

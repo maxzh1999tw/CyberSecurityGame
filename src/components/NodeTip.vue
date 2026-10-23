@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // 節點狀態與單格弱點分開顯示，避免滑過單格時帶出其他情報。
 import { computed, onBeforeUnmount, onUpdated, ref, watch } from 'vue'
+import { companyKnows } from '../game/company'
+import { HIRES, TIER_NAME } from '../game/companyData'
 import { VULNS, repairTurnsOf } from '../game/data'
-import { canRecon, etaOf, isImpregnable, reachKnown, recaptureBlock, recaptureSpeedOf, repairBlock, speedOf } from '../game/engine'
+import { canRecon, etaOf, isImpregnable, reachKnown, recaptureBlock, recaptureSpeedOf, repairBlock, repairSpeedOf, speedOf } from '../game/engine'
 import { game, nodeRect, ui, view } from '../game/store'
 import Icon from './Icon.vue'
 
@@ -18,6 +20,21 @@ const selectedNodeId = computed(() => {
   return ui.hoverSlot?.nodeId ?? ui.hoverNode
 })
 const node = computed(() => selectedNodeId.value ? game.s?.nodes.find((n) => n.id === selectedNodeId.value) ?? null : null)
+/** 公司模式：提示改成公司的視角 */
+const company = computed(() => game.s?.mode === 'company')
+const econ = computed(() => {
+  const n = node.value
+  if (!company.value || !n?.econ) return null
+  const def = HIRES[n.econ.hire]
+  return {
+    label: def.label,
+    tier: TIER_NAME[n.kind === 'employee' ? 'person' : 'machine'][n.econ.tier],
+    value: n.econ.value,
+    cost: n.econ.cost,
+    effect: def.effect,
+    reach: game.s && reachKnown(game.s, n) === 'Y',
+  }
+})
 const tipKind = computed(() => selectedSlotIndex.value === undefined ? 'node' : 'weakness')
 
 // 實際高度由畫面量測，確保整張提示卡都留在視窗內
@@ -94,7 +111,7 @@ const slotTip = computed(() => {
   }
 
   const sl = n.slots[idx]
-  if (sl.vis === 0) return null
+  if (company.value ? !companyKnows(sl) : sl.vis === 0) return null
   const d = VULNS[sl.vuln]
   if (sl.shield) {
     return {
@@ -120,6 +137,24 @@ const slotTip = computed(() => {
   }
 
   const nullified = n.slots.some((other, otherIdx) => otherIdx !== idx && other.shield && other.vuln === sl.vuln && other.vis > 0)
+  // 公司模式：告訴玩家怎麼修，以及駭客知不知道
+  if (company.value) {
+    const pub = sl.vis === 2
+    const eta = sl.timer !== undefined && game.s ? etaOf(sl.timer, repairSpeedOf(game.s)) : 0
+    return {
+      kind: 'vuln',
+      name: d.name,
+      icon: d.icon,
+      text: d.desc,
+      rule: d.rule ?? '',
+      status: pub ? '駭客也知道' : '只有你知道',
+      eye: pub ? 'pub' : 'own',
+      who: pub
+        ? '紅色眼睛：這是駭客揭露的，駭客也知道這個弱點，隨時可能拿來入侵。'
+        : '綠色眼睛：這是公司自己偵查到的，駭客看不到；趁他發現之前補好。',
+      repair: `怎麼防：${d.fix}${eta ? `（${repairFrozen.value ? '修補暫停中' : `約 ${eta} 回合後自動修好`}）` : ''}`,
+    }
+  }
   const repair = sl.timer !== undefined
     ? repairFrozen.value
       ? '修補倒數暫停中'
@@ -171,7 +206,27 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
     :data-tip-kind="tipKind"
     :style="!props.nodeId && pos ? { left: pos.x + 'px', top: pos.y + 'px', width: pos.W + 'px' } : undefined"
   >
-    <template v-if="tipKind === 'node'">
+    <template v-if="tipKind === 'node' && econ">
+      <div class="h">
+        <b>{{ node.name }}</b>
+        <span class="st">{{ econ.label }}・{{ econ.tier }}</span>
+        <span v-if="node.controlled" class="st ctrl hacked">被入侵</span>
+        <span v-if="node.paralyzed !== 0" class="st para">癱瘓 {{ node.paralyzed }} 回合</span>
+      </div>
+      <div class="nr">
+        <Icon name="coins" :size="20" :stroke="2.4" />
+        <span>{{ econ.value ? `每回合產值 +${econ.value}K，成本 −${econ.cost}K` : `防守節點：沒有產值，每回合成本 −${econ.cost}K` }}</span>
+      </div>
+      <div class="ab on">
+        <Icon :name="HIRES[node.econ!.hire].icon" :size="22" :stroke="2.3" />
+        <span>{{ econ.effect }}</span>
+      </div>
+      <div class="lk" :class="{ uncertain: !econ.reach }">
+        <Icon :name="econ.reach ? 'lock-open' : 'lock'" :size="20" :stroke="2.4" />
+        {{ econ.reach ? '駭客已經碰得到這個節點' : '駭客還碰不到這個節點' }}
+      </div>
+    </template>
+    <template v-else-if="tipKind === 'node'">
       <div class="h">
         <b>{{ node.name }}</b>
         <span v-if="node.controlled" class="st ctrl">已控制</span>
@@ -198,9 +253,13 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
         <b>{{ slotTip.name }}</b>
         <span>{{ slotTip.text }}</span>
         <em v-if="slotTip.rule">規則：{{ slotTip.rule }}</em>
+        <small v-if="slotTip.who" class="who" :class="slotTip.eye">{{ slotTip.who }}</small>
         <small v-if="slotTip.repair">{{ slotTip.repair }}</small>
       </div>
-      <span v-if="slotTip.status === '已揭露'" class="vis pub" title="公司看得到，會開始修復倒數">
+      <span v-if="slotTip.eye" class="vis" :class="slotTip.eye">
+        <Icon name="eye" :size="16" :stroke="2.4" />{{ slotTip.status }}
+      </span>
+      <span v-else-if="slotTip.status === '已揭露'" class="vis pub" title="公司看得到，會開始修復倒數">
         <Icon name="eye" :size="16" :stroke="2.4" />{{ slotTip.status }}
       </span>
       <span v-else class="vis" :class="slotTip.kind === 'fixed' ? 'fixed-status' : 'protected-status'">{{ slotTip.status }}</span>
@@ -210,6 +269,13 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
 
 <style scoped>
 .tip {
+  /* 提示框一律是深色底：公司模式的淺色主題不能把字也換成深色 */
+  --text: #f2f5fa;
+  --text2: #b5c1d6;
+  --text3: #8f9cb4;
+  --good2: #86e2b6;
+  --bad2: #ff9a8c;
+  color: var(--text);
   position: absolute;
   z-index: 55;
   padding: 16px 18px;
@@ -234,7 +300,7 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
   gap: 8px;
   box-shadow: none;
   pointer-events: auto;
-  font-size: 15px;
+  font-size: 17px;
 }
 .tip.mobile-modal .h {
   font-size: 20px;
@@ -244,18 +310,18 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
   padding: 8px;
 }
 .tip.mobile-modal .vt b {
-  font-size: 16px;
+  font-size: 18px;
 }
 .tip.mobile-modal .vt span,
 .tip.mobile-modal .vt em,
 .tip.mobile-modal .vt small,
 .tip.mobile-modal .nr span {
-  font-size: 14px;
+  font-size: 16px;
 }
 .tip.mobile-modal .st,
 .tip.mobile-modal .vis,
 .tip.mobile-modal .lk {
-  font-size: 14px;
+  font-size: 16px;
 }
 .h {
   display: flex;
@@ -266,12 +332,15 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
 .st {
   padding: 1px 12px;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
   color: #fff;
 }
 .st.ctrl {
   background: var(--good);
+}
+.st.ctrl.hacked {
+  background: #c8402f;
 }
 .st.para {
   background: #4a8cc0;
@@ -312,7 +381,7 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
   place-items: center;
   border: 2px solid currentColor;
   border-radius: 50%;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
 }
 .vr {
@@ -352,13 +421,13 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
   font-size: 20px;
 }
 .vt span {
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   color: var(--ink2);
 }
 .vt small {
   margin-top: 2px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   color: #6a4a1c;
 }
@@ -379,7 +448,7 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
 }
 .vt em {
   font-style: normal;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
   color: #8a5a1c;
 }
@@ -390,12 +459,25 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
   gap: 3px;
   padding: 1px 9px 1px 6px;
   border-radius: 10px;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 900;
   color: #fff;
 }
 .vis.pub {
   background: #c8402f;
+}
+.vis.own {
+  background: #2c8f66;
+}
+.who {
+  font-weight: 800;
+}
+/* 弱點列是米色底：用深一點的紅、綠 */
+.who.pub {
+  color: #b42318;
+}
+.who.own {
+  color: #1d6e47;
 }
 .vis.protected-status {
   background: #2b9c78;

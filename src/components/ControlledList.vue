@@ -72,7 +72,7 @@ function look(id: string) {
   justify-content: center;
   gap: 10px;
   padding: 6px 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
   letter-spacing: 4px;
   text-indent: 4px;
@@ -85,7 +85,7 @@ function look(id: string) {
   padding: 0 6px;
   border-radius: 13px;
   font-family: var(--font-num);
-  font-size: 18px;
+  font-size: 20px;
   letter-spacing: 0;
   text-indent: 0;
   text-align: center;
@@ -126,9 +126,9 @@ function look(id: string) {
   flex-direction: column;
 }
 .tx b {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 900;
-  line-height: 1.25;
+  line-height: 1.35;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -137,7 +137,7 @@ function look(id: string) {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 13.5px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--good2);
 }
@@ -176,7 +176,7 @@ function look(id: string) {
 }
 .empty {
   padding: 10px 4px;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--text3);
 }
 </style>

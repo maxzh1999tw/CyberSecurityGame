@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// 第一次遊玩時的 4 步導覽：直接指著畫面上的東西
+// 第一次遊玩時的導覽：直接指著畫面上的東西（駭客模式、公司模式各一套）
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { anchorRect, boardCenter, game, nodeRect, ui, view } from '../game/store'
+import { anchorRect, boardCenter, coachKey, game, nodeRect, ui, view } from '../game/store'
 import type { Rect } from '../game/store'
 import Icon from './Icon.vue'
 
@@ -12,18 +12,21 @@ interface Step {
   side: 'above' | 'below' | 'left' | 'right'
 }
 
-const STEPS: Step[] = [
+// 每間公司的節點不同：指著外圍的第一個節點
+const firstOuter = () => {
+  const first = game.s?.nodes.find((n) => n.layer === 0)
+  return first ? nodeRect(first.id) : null
+}
+const handZone = (): Rect => ({ x: boardCenter() - 400, y: view.h - 250, w: 800, h: 250, cx: boardCenter(), cy: view.h - 125 })
+
+const HACKER_STEPS: Step[] = [
   {
-    // 每間公司的節點不同：指著外圍的第一個節點
-    target: () => {
-      const first = game.s?.nodes.find((n) => n.layer === 0)
-      return first ? nodeRect(first.id) : null
-    },
+    target: firstOuter,
     text: '每個節點底下都蓋著牌，其中有些是可以利用的弱點。先偵查，再下手。',
     side: 'above',
   },
   {
-    target: () => ({ x: boardCenter() - 400, y: view.h - 250, w: 800, h: 250, cx: boardCenter(), cy: view.h - 125 }),
+    target: handZone,
     text: '把手牌拖到目標身上就能出牌。實線綠框一定成功，虛線黃框要賭一把。',
     side: 'above',
   },
@@ -39,7 +42,42 @@ const STEPS: Step[] = [
   },
 ]
 
-const step = computed(() => (ui.coach === null ? null : STEPS[ui.coach]))
+const COMPANY_STEPS: Step[] = [
+  {
+    target: firstOuter,
+    text: '每個節點底下都蓋著牌，有些是弱點。用稽核把弱點找出來，找到的弱點會自己慢慢修好。',
+    side: 'above',
+  },
+  {
+    target: handZone,
+    text: '把手牌拖到節點身上就能出牌。每張牌都要花錢，錢不夠的牌會變灰。',
+    side: 'above',
+  },
+  {
+    target: () => anchorRect('money'),
+    text: '公司的錢在這裡。回合結束時，產值扣掉薪水和這回合出牌的花費，就是這回合的營收。',
+    side: 'right',
+  },
+  {
+    target: () => anchorRect('hackerFeed'),
+    text: '駭客出的每張牌都會列在這裡，滑過去可以看那張牌的效果。',
+    side: 'left',
+  },
+  {
+    target: () => anchorRect('alert'),
+    text: '駭客的牌會製造噪音。警戒值到 10 就抓到駭客，你就贏了。',
+    side: 'below',
+  },
+  {
+    target: () => anchorRect('end'),
+    text: '出完牌，按這裡結束回合，換駭客行動。',
+    side: 'left',
+  },
+]
+
+const company = computed(() => game.s?.mode === 'company')
+const STEPS = computed(() => (company.value ? COMPANY_STEPS : HACKER_STEPS))
+const step = computed(() => (ui.coach === null ? null : STEPS.value[ui.coach]))
 const rect = computed(() => step.value?.target() ?? null)
 
 const box = computed(() => {
@@ -75,7 +113,10 @@ const bubble = computed(() => {
   let y = 0
   if (s.side === 'above') y = r.y - 20 - H
   else if (s.side === 'below') y = r.y + r.h + 20
-  else {
+  else if (s.side === 'right') {
+    x = r.x + r.w + 28
+    y = r.cy - H / 2
+  } else {
     x = r.x - W - 28
     y = r.cy - H / 2
   }
@@ -86,13 +127,13 @@ const bubble = computed(() => {
 
 function next() {
   if (ui.coach === null) return
-  if (ui.coach < STEPS.length - 1) ui.coach++
+  if (ui.coach < STEPS.value.length - 1) ui.coach++
   else finish()
 }
 function finish() {
   ui.coach = null
   try {
-    localStorage.setItem('csg-coach', '1')
+    localStorage.setItem(coachKey(company.value ? 'company' : 'hacker'), '1')
   } catch {
     /* 沒有儲存空間也沒關係 */
   }
@@ -100,7 +141,7 @@ function finish() {
 </script>
 
 <template>
-  <div v-if="step && box && bubble" class="coach">
+  <div v-if="step && box && bubble" class="coach" :class="{ office: company }">
     <div class="hole" :style="{ left: box.x + 'px', top: box.y + 'px', width: box.w + 'px', height: box.h + 'px' }"></div>
     <div ref="bubbleEl" class="bubble" :style="{ left: bubble.x + 'px', top: bubble.y + 'px', width: bubble.W + 'px' }">
       <p>{{ step.text }}</p>
@@ -162,6 +203,28 @@ function finish() {
 }
 .dots i.on {
   background: var(--gold);
+}
+/* 公司模式是亮色的辦公室：說明框用白底深字、藍色外框 */
+.office .hole {
+  border-color: var(--o-blue);
+  box-shadow: 0 0 0 4000px rgba(20, 35, 60, 0.6);
+}
+.office .bubble {
+  background: #fff;
+  border-color: var(--o-blue);
+  box-shadow: 0 16px 40px rgba(20, 35, 60, 0.35);
+}
+.office .bubble p {
+  color: var(--text);
+}
+.office .dots i {
+  background: #d3dbe6;
+}
+.office .dots i.on {
+  background: var(--o-blue);
+}
+.office .skip:hover {
+  color: var(--text);
 }
 .skip {
   height: 52px;

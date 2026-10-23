@@ -1,23 +1,31 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted } from 'vue'
-import { confirmIntro, endTurn, fastForward, playLine, ui } from '../game/store'
+import { companyEndTurn, confirmCompanyIntro } from '../game/companyStore'
+import { confirmIntro, endTurn, game, playLine, ui } from '../game/store'
 import AlertMeter from './AlertMeter.vue'
 import CoachOverlay from './CoachOverlay.vue'
 import ControlledList from './ControlledList.vue'
 import BoardLayers from './BoardLayers.vue'
 import CastLayer from './CastLayer.vue'
+import CompanyHud from './CompanyHud.vue'
 import CompanyPanel from './CompanyPanel.vue'
+import CompanyStatus from './CompanyStatus.vue'
 import EffectLayer from './EffectLayer.vue'
 import GameMenu from './GameMenu.vue'
+import HackerFeed from './HackerFeed.vue'
 import HandArea from './HandArea.vue'
 import HelpOverlay from './HelpOverlay.vue'
 import IntroOverlay from './IntroOverlay.vue'
+import CompanyIntro from './CompanyIntro.vue'
 import MissionPanel from './MissionPanel.vue'
 import MobileInfoPopover from './MobileInfoPopover.vue'
 import NodeTip from './NodeTip.vue'
 import PlayerHud from './PlayerHud.vue'
 import ResultOverlay from './ResultOverlay.vue'
 import TargetArrow from './TargetArrow.vue'
+
+// 公司模式：你經營公司，駭客由電腦操作
+const company = computed(() => game.s?.mode === 'company')
 
 // 拖「不用選目標」的牌時，場上亮出出牌區
 const zone = computed(() => {
@@ -32,8 +40,10 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault()
     if (!e.repeat) {
       if (ui.intro) confirmIntro()
-      else if (ui.busy) fastForward()
-      else if (!ui.drag) void endTurn()
+      else if (ui.companyIntro) confirmCompanyIntro()
+      else if (ui.busy || ui.drag) return
+      else if (company.value) companyEndTurn()
+      else void endTurn()
     }
   }
 }
@@ -42,24 +52,30 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
-  <div class="game felt" @pointerdown.capture="fastForward" @click="ui.menuOpen && (ui.menuOpen = false)">
-    <aside class="rail left"><MissionPanel /><ControlledList /></aside>
+  <div class="game felt" :class="{ office: company }" @click="ui.menuOpen && (ui.menuOpen = false)">
+    <aside class="rail left">
+      <CompanyStatus v-if="company" />
+      <template v-else><MissionPanel /><ControlledList /></template>
+    </aside>
     <aside class="rail right">
       <div class="gearbox"><GameMenu @click.stop /></div>
-      <CompanyPanel />
+      <HackerFeed v-if="company" />
+      <CompanyPanel v-else />
     </aside>
 
     <div class="top"><AlertMeter /></div>
 
     <div v-if="zone" class="playzone" :class="{ active: zone.active }"></div>
     <BoardLayers />
-    <PlayerHud />
+    <CompanyHud v-if="company" />
+    <PlayerHud v-else />
     <HandArea />
     <TargetArrow />
     <NodeTip />
     <CastLayer />
     <EffectLayer />
     <IntroOverlay />
+    <CompanyIntro v-if="company" />
     <ResultOverlay />
     <CoachOverlay />
     <HelpOverlay />
@@ -72,6 +88,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   position: absolute;
   inset: 0;
   overflow: hidden;
+  /* clip：不能被捲動。點到半露出畫面的按鈕時，瀏覽器不會把整個畫面捲上去 */
+  overflow: clip;
 }
 .rail {
   position: absolute;
@@ -105,6 +123,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+/* 公司模式：右下角的回合資訊、換牌區、結束回合疊在右欄上，右欄底部要讓出這塊 */
+.game.office .rail.right {
+  padding-bottom: 320px;
 }
 .gearbox {
   display: flex;

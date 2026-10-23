@@ -1,17 +1,31 @@
 <script setup lang="ts">
-// 手牌：扇形排列，滑過放大，按住拖曳出牌
+// 手牌：扇形排列，滑過放大，按住拖曳出牌（駭客牌與公司牌共用）
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { sfx } from '../audio/sfx'
 import { CARDS } from '../game/data'
-import { knownHas, noLogs, playability } from '../game/engine'
+import { knownHas, noLogs } from '../game/engine'
 import type { Playability } from '../game/engine'
-import { anchorRect, boardCenter, cancelPointerDrag, game, handOrigin, playLine, pointerDownCard, ui, view } from '../game/store'
-import type { CardInst } from '../game/types'
+import {
+  anchorRect,
+  boardCenter,
+  cancelPointerDrag,
+  game,
+  handOrigin,
+  playLine,
+  playerHand,
+  playerPlayability,
+  pointerDownCard,
+  ui,
+  view,
+} from '../game/store'
+import type { CardId, CompanyCardId } from '../game/types'
 import CardFace from './CardFace.vue'
 import CardTip from './CardTip.vue'
+import CompanyCardFace from './CompanyCardFace.vue'
 
 const s = computed(() => game.s!)
-const hand = computed<CardInst[]>(() => game.s?.hand ?? [])
+const company = computed(() => game.s?.mode === 'company')
+const hand = computed(() => (game.s ? playerHand(game.s) : []))
 
 const REST_SCALE = 0.8
 const HOVER_SCALE = 1.22
@@ -20,7 +34,7 @@ const HOLD_TO_PREVIEW_MS = 440
 const TOUCH_DRAG_THRESHOLD = 12
 
 interface Slot {
-  c: CardInst
+  c: { uid: number; id: CardId | CompanyCardId }
   pb: Playability
   style: Record<string, string>
   cls: Record<string, boolean>
@@ -145,7 +159,8 @@ function onCardPointerDown(uid: number, ev: PointerEvent) {
     pointerDownCard(uid, ev)
     return
   }
-  if (blockUntilTouchesEnd || activeTouchPointers.size > 1 || ui.busy || !game.s || game.s.phase !== 'hacker') return
+  // 不是自己的回合也能長按放大來看；能不能拖曳出牌由 pointerDownCard 判斷
+  if (blockUntilTouchesEnd || activeTouchPointers.size > 1 || !game.s) return
 
   ui.hoverNode = null
   ui.hoverSlot = null
@@ -193,7 +208,7 @@ const slots = computed<Slot[]>(() => {
   const spread = n <= 1 ? 0 : Math.min(172, 860 / (n - 1))
   const deck = anchorRect('deck')
   return list.map((c) => {
-    const pb = playability(st, c.id)
+    const pb = playerPlayability(st, c.id)
     const idx = rest.findIndex((o) => o.uid === c.uid)
     const off = idx - mid
     let x = off * spread
@@ -263,12 +278,13 @@ const slots = computed<Slot[]>(() => {
       z = 800
       tr = 'transform 260ms cubic-bezier(.18,1.16,.32,1), opacity 180ms ease-out'
       cls.preview = true
-    } else if (ui.hoverCard === c.uid && !ui.drag && !ui.busy) {
+    } else if (ui.hoverCard === c.uid && !ui.drag) {
       x = Math.max(-420, Math.min(420, x))
       y = -10
       rot = 0
       scale = HOVER_SCALE
       z = 200
+      cls.zoom = true
     }
 
     const style: Record<string, string> = {
@@ -289,7 +305,8 @@ const slots = computed<Slot[]>(() => {
 
 function onEnter(uid: number, ev: PointerEvent) {
   if (ev.pointerType === 'touch') return
-  if (ui.drag || ui.busy) return
+  // 演出中、駭客回合時也能滑過放大來看
+  if (ui.drag) return
   ui.hoverNode = null
   ui.hoverSlot = null
   ui.hoverCard = uid
@@ -303,7 +320,7 @@ function onLeave(uid: number) {
 // 只有在「沒人看紀錄」已被揭露時，牌面才顯示減半後的噪音（不能洩漏還蓋著的資訊）
 const nolog = computed(() => {
   const st = s.value
-  return st ? noLogs(st, knownHas) === 'Y' : false
+  return st && !company.value ? noLogs(st, knownHas) === 'Y' : false
 })
 
 onMounted(() => {
@@ -348,16 +365,19 @@ onBeforeUnmount(() => {
       @pointerdown.prevent="onCardPointerDown(sl.c.uid, $event)"
     >
       <div class="aura"></div>
-      <CardFace
-        :id="sl.c.id"
-        :cost="sl.pb.cost"
-        :free="sl.pb.free"
-        :unaffordable="!sl.pb.affordable"
-        :dead="sl.pb.status === 'dead'"
-        :noise="nolog ? Math.ceil(CARDS[sl.c.id].noise / 2) : undefined"
-        :noise-halved="nolog"
-      />
-      <CardTip v-if="ui.hoverCard === sl.c.uid && !ui.drag && !previewUid" />
+      <CompanyCardFace v-if="company" :id="sl.c.id as CompanyCardId" :cost="sl.pb.cost" :dead="sl.pb.status === 'dead'" />
+      <template v-else>
+        <CardFace
+          :id="sl.c.id as CardId"
+          :cost="sl.pb.cost"
+          :free="sl.pb.free"
+          :unaffordable="!sl.pb.affordable"
+          :dead="sl.pb.status === 'dead'"
+          :noise="nolog ? Math.ceil(CARDS[sl.c.id as CardId].noise / 2) : undefined"
+          :noise-halved="nolog"
+        />
+        <CardTip v-if="ui.hoverCard === sl.c.uid && !ui.drag && !previewUid" />
+      </template>
     </div>
   </div>
 </template>
@@ -424,8 +444,14 @@ onBeforeUnmount(() => {
 .hc.nope {
   filter: saturate(0.7) brightness(0.88);
 }
-.hc.preview {
+.hc.preview,
+.hc.nope.zoom {
+  /* 放大來看的牌不要變暗（駭客回合時手牌是「先不能出」的暗色） */
   filter: none;
+}
+/* 現在用不了的牌放大來看時，只稍微褪色，字要看得清楚 */
+.hc.dead.zoom {
+  filter: saturate(0.6);
 }
 
 @media (pointer: coarse) and (orientation: landscape) and (max-width: 1000px) {
