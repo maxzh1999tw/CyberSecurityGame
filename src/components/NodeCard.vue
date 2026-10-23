@@ -704,15 +704,6 @@ function leave() {
 .infected .avatar {
   animation: glitch 3.4s infinite;
 }
-/* 被你控制的節點：頭像偶爾閃一下雜訊（比病毒輕、間隔長） */
-.ctrl:not(.infected) .avatar {
-  animation: glitch 9s var(--phase, 0s) infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .ctrl:not(.infected) .avatar {
-    animation: none;
-  }
-}
 .infected .name {
   animation: glitch-text 3.4s infinite;
 }
