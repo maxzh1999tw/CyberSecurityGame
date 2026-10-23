@@ -117,11 +117,14 @@ function rollSlots(r: Rng, kind: NodeKind, role: NodeRole, tier: Tier, count: nu
   return out
 }
 
-/** 人物：挑一組還沒用過、等級說得通的「名字＋頭像」 */
+/**
+ * 人物：名字、頭像、星級固定成一組。挑一位還沒出現過、星級符合的人；
+ * 這個星級的人都用完了，就改挑其他星級還沒出現過的人（同一個人不會出現兩次）。
+ */
 function personaFor(r: Rng, hire: 'staff' | 'exec' | 'it', tier: Tier, used: string[]): Persona {
-  const fits = (p: Persona) => (p.minTier ?? 1) <= tier && tier <= (p.maxTier ?? 3)
-  const pool = PERSONAS[hire].filter((p) => fits(p) && !used.includes(p.name))
-  const p = pool.length ? pick(r, pool) : pick(r, PERSONAS[hire].filter(fits))
+  const free = PERSONAS[hire].filter((p) => !used.includes(p.name))
+  const sameTier = free.filter((p) => p.tier === tier)
+  const p = sameTier.length ? pick(r, sameTier) : free.length ? pick(r, free) : pick(r, PERSONAS[hire].filter((x) => x.tier === tier))
   used.push(p.name)
   return p
 }
@@ -138,11 +141,12 @@ function machineName(r: Rng, hire: 'ai' | 'db' | 'backup' | 'infra', tier: Tier,
 /** 產生一位候選人（等級、名字、成本、產值、底下的牌都是隨機的） */
 export function makeCandidate(r: Rng & { uidSeq: number }, hire: HireKind, used: string[], tier?: Tier): Candidate {
   const def = HIRES[hire]
-  const t = tier ?? rollTier(r)
+  const want = tier ?? rollTier(r)
+  // 人：名字、頭像、星級是固定的一組（星級跟著人走）；機器：名字看等級，頭像固定
+  const person = hire === 'staff' || hire === 'exec' || hire === 'it' ? personaFor(r, hire, want, used) : null
+  const t = person ? person.tier : want
   const { cost, value } = tierStats(hire, t)
   const within = ([lo, hi]: [number, number]) => lo + rndInt(r, hi - lo + 1)
-  // 人：名字和頭像是一組；機器：名字看等級，頭像固定
-  const person = hire === 'staff' || hire === 'exec' || hire === 'it' ? personaFor(r, hire, t, used) : null
   const role = person?.role ?? pick(r, def.roles)
   return {
     uid: r.uidSeq++,
@@ -197,9 +201,10 @@ export function newDraft(seed?: number): DraftState {
     brand: { ...DEFAULT_BRAND },
   }
   for (const hire of HIRE_KINDS) {
-    // 每一類至少各有一位菜鳥／資深／王牌（或破爛／標準／頂規），其餘隨機
+    // 每一類每個星級至少各有幾位（菜鳥／資深／王牌或破爛／標準／頂規；IT、主管、AI、基礎設施各 2 位），其餘隨機
+    const per = COMPANY.marketPerTier[hire] ?? 1
     for (let k = 0; k < COMPANY.marketSize[hire]; k++) {
-      const tier = k < 3 ? ((k + 1) as Tier) : undefined
+      const tier = k < 3 * per ? ((Math.floor(k / per) + 1) as Tier) : undefined
       d.market[hire].push(makeCandidate(d, hire, d.usedNames, tier))
     }
     sortMarket(d, hire)
@@ -623,7 +628,7 @@ function renew(s: GameState, n: GameNode, tier: Tier) {
     sealed: false,
     excluded: {},
     training: false,
-    econ: { hire, tier, cost: fresh.cost, value: fresh.value },
+    econ: { hire, tier: fresh.tier, cost: fresh.cost, value: fresh.value },
   })
 }
 

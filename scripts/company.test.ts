@@ -59,6 +59,10 @@ test('人力市場：每一類都有遠多於需要的候選人，而且四種�
     const d = newDraft(seed)
     for (const hire of HIRE_KINDS) {
       assert.equal(d.market[hire].length, COMPANY.marketSize[hire])
+      for (const tier of [1, 2, 3]) {
+        const n = d.market[hire].filter((c) => c.tier === tier).length
+        assert.ok(n >= (COMPANY.marketPerTier[hire] ?? 1), `${hire} ${tier} 星只有 ${n} 位`)
+      }
       assert.ok(d.market[hire].length > REQUIRED[hire], `${hire} 的候選人要比需要的多`)
       for (const t of [1, 2, 3]) assert.ok(d.market[hire].some((c) => c.tier === t), `${hire} 缺少等級 ${t}`)
       if (hire === 'ai' || hire === 'db' || hire === 'backup' || hire === 'infra') {
@@ -375,7 +379,7 @@ test('資安保險在下次被控制時理賠；公關把警戒推到 10 就抓�
   assert.equal(node(s, staff.id).controlled, true)
 })
 
-test('人物的名字和頭像固定成對、等級說得通；機器依等級取名', () => {
+test('人物的名字、頭像、星級固定成一組，同一個人不會出現兩次；機器依等級取名', () => {
   for (let seed = 1; seed <= 200; seed++) {
     const d = newDraft(seed)
     for (const hire of ['staff', 'exec', 'it'] as const) {
@@ -383,8 +387,10 @@ test('人物的名字和頭像固定成對、等級說得通；機器依等級�
         const p = PERSONAS[hire].find((x) => x.name === c.name)
         assert.ok(p, `${c.name} 不是固定的人物`)
         assert.equal(c.art, p!.art, `${c.name} 的頭像不對`)
-        assert.ok(c.tier >= (p!.minTier ?? 1) && c.tier <= (p!.maxTier ?? 3), `${c.name} 不該是等級 ${c.tier}`)
+        assert.equal(c.tier, p!.tier, `${c.name} 應該是 ${p!.tier} 星`)
       }
+      const names = d.market[hire].map((c) => c.name)
+      assert.equal(new Set(names).size, names.length, `${hire} 有人重複出現`)
     }
     for (const hire of ['ai', 'db', 'backup', 'infra'] as const) {
       for (const c of d.market[hire]) assert.ok(MACHINE_NAMES[hire][c.tier].includes(c.name), `${c.name} 的名字和等級對不上`)

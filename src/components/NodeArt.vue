@@ -426,6 +426,186 @@ defineProps<{ art: string }>()
       <path d="M97 112 C97 120 90 122 84 122" fill="none" stroke="#ffd36b" stroke-width="2.4" stroke-linecap="round" />
     </g>
 
+    <!-- 網管小葉：馬尾、青綠襯衫、耳機麥克風、路由器 -->
+    <g v-else-if="art === 'netadmin'">
+      <path d="M10 124 C10 98 32 88 60 88 C88 88 110 98 110 124 Z" fill="#2a9d8f" />
+      <path d="M46 88 L60 102 L74 88 Z" fill="#e8fbf7" />
+      <rect x="51" y="70" width="18" height="22" rx="7" fill="#e0a57d" />
+      <path d="M78 34 C94 40 94 64 84 78 C86 62 84 48 74 40 Z" fill="#3b2618" />
+      <ellipse cx="60" cy="56" rx="19" ry="22" fill="url(#skinG)" />
+      <path d="M40 52 C38 34 48 26 60 26 C74 26 82 34 80 52 C74 42 66 38 60 40 C52 38 44 42 40 52 Z" fill="#3b2618" />
+      <circle cx="79" cy="38" r="3.2" fill="#ffd36b" />
+      <circle class="eye" cx="52" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="68" cy="58" r="2.6" fill="#2a1a22" />
+      <path d="M53 68 Q60 73 67 68" fill="none" stroke="#b5475c" stroke-width="2.4" stroke-linecap="round" />
+      <ellipse cx="47" cy="65" rx="4" ry="2.4" fill="#ff9aa6" opacity="0.45" />
+      <ellipse cx="73" cy="65" rx="4" ry="2.4" fill="#ff9aa6" opacity="0.45" />
+      <path d="M38 54 C38 40 46 34 60 34 C74 34 82 40 82 54" fill="none" stroke="#1c2233" stroke-width="3.2" stroke-linecap="round" />
+      <rect x="33" y="52" width="7" height="13" rx="3.5" fill="#1c2233" />
+      <path d="M36 63 C36 73 43 77 51 75" fill="none" stroke="#1c2233" stroke-width="2.4" stroke-linecap="round" />
+      <circle cx="52" cy="75" r="2.6" fill="#38d6ff" />
+      <path d="M88 98 L85 88 M102 98 L105 88" stroke="#9aa6b8" stroke-width="2" stroke-linecap="round" />
+      <rect x="82" y="98" width="26" height="11" rx="3" fill="#1b2438" stroke="#38d6ff" stroke-width="1.6" />
+      <circle class="led" cx="89" cy="103.5" r="1.6" fill="#2cf5a0" style="--i: 0" />
+      <circle class="led" cx="95" cy="103.5" r="1.6" fill="#2cf5a0" style="--i: 1" />
+      <circle class="led" cx="101" cy="103.5" r="1.6" fill="#ffd36b" style="--i: 2" />
+    </g>
+
+    <!-- 資訊助理小琪：短鮑伯頭、淺藍針織外套、報修單 -->
+    <g v-else-if="art === 'helpdesk'">
+      <path d="M10 124 C10 98 32 88 60 88 C88 88 110 98 110 124 Z" fill="#7fb3e8" />
+      <path d="M50 88 L60 100 L70 88 Z" fill="#f4f6fb" />
+      <path d="M50 88 L50 124 M70 88 L70 124" stroke="#5e93cc" stroke-width="2" />
+      <rect x="51" y="70" width="18" height="22" rx="7" fill="#e0a57d" />
+      <path d="M36 62 C32 36 46 24 60 24 C74 24 88 36 84 62 C84 72 80 76 76 74 L76 50 C66 44 54 44 44 50 L44 74 C40 76 36 72 36 62 Z" fill="#2b1d16" />
+      <ellipse cx="60" cy="56" rx="19" ry="22" fill="url(#skinG)" />
+      <path d="M40 52 C42 34 52 30 62 30 C72 30 80 38 80 50 C70 42 56 40 40 52 Z" fill="#2b1d16" />
+      <circle class="eye" cx="52" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="68" cy="58" r="2.6" fill="#2a1a22" />
+      <path d="M54 68 Q60 72 66 68" fill="none" stroke="#b5475c" stroke-width="2.4" stroke-linecap="round" />
+      <ellipse cx="47" cy="65" rx="4" ry="2.4" fill="#ff9aa6" opacity="0.5" />
+      <ellipse cx="73" cy="65" rx="4" ry="2.4" fill="#ff9aa6" opacity="0.5" />
+      <rect x="84" y="92" width="24" height="18" rx="3" fill="#ffe08a" stroke="#c99a2e" stroke-width="1.4" />
+      <path d="M89 98 L103 98 M89 103 L99 103" stroke="#a37a1c" stroke-width="1.6" stroke-linecap="round" />
+      <path d="M84 92 L96 86 L108 92" fill="none" stroke="#c99a2e" stroke-width="1.4" stroke-linejoin="round" />
+    </g>
+
+    <!-- 系統工程師老吳：灰白短髮、落腮鬍、灰色帽 T、咖啡杯 -->
+    <g v-else-if="art === 'sysadmin'">
+      <path d="M8 124 C8 98 30 88 60 88 C90 88 112 98 112 124 Z" fill="#5b6476" />
+      <path d="M36 92 C36 78 46 72 60 72 C74 72 84 78 84 92" fill="none" stroke="#454d5e" stroke-width="7" stroke-linecap="round" />
+      <path d="M54 92 L52 108 M66 92 L68 108" stroke="#e9edf3" stroke-width="2" stroke-linecap="round" />
+      <rect x="51" y="70" width="18" height="18" rx="7" fill="#d9a07a" />
+      <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
+      <path d="M38 50 C36 30 48 22 62 22 C76 22 86 32 82 50 C78 40 70 36 60 38 C50 36 42 40 38 50 Z" fill="#7d838f" />
+      <path d="M46 30 Q56 26 66 28" fill="none" stroke="#b7bcc6" stroke-width="2" stroke-linecap="round" />
+      <path d="M41 60 C42 78 52 84 60 84 C68 84 78 78 79 60 C75 70 68 74 60 74 C52 74 45 70 41 60 Z" fill="#6b707b" />
+      <circle class="eye" cx="52" cy="57" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="57" r="2.4" fill="#1a1a24" />
+      <path d="M46 51 Q52 49 57 51 M63 51 Q68 49 74 51" fill="none" stroke="#5a5f6a" stroke-width="2.4" stroke-linecap="round" />
+      <path d="M55 70 Q60 72 65 70" fill="none" stroke="#3a3f4c" stroke-width="2.4" stroke-linecap="round" />
+      <g transform="translate(84 92)">
+        <path class="steam" d="M6 -4 Q3 -9 6 -14 M12 -4 Q9 -9 12 -14" fill="none" stroke="#c7d2e2" stroke-width="1.8" stroke-linecap="round" />
+        <rect x="0" y="0" width="18" height="18" rx="3" fill="#f4f6fb" stroke="#9aa6b8" stroke-width="1.4" />
+        <path d="M18 4 Q25 4 25 9 Q25 14 18 14" fill="none" stroke="#9aa6b8" stroke-width="2" />
+        <path d="M4 7 L14 7" stroke="#38d6ff" stroke-width="2" stroke-linecap="round" />
+      </g>
+    </g>
+
+    <!-- 資安分析師凱文：黑色帽 T 戴上帽子、綠色盾牌 -->
+    <g v-else-if="art === 'secops'">
+      <path d="M8 124 C8 98 30 88 60 88 C90 88 112 98 112 124 Z" fill="#23283a" />
+      <path d="M32 92 C26 64 38 26 60 26 C82 26 94 64 88 92 C80 86 72 84 60 84 C48 84 40 86 32 92 Z" fill="#2e3449" />
+      <path d="M54 94 L52 112 M66 94 L68 112" stroke="#8a93a8" stroke-width="2" stroke-linecap="round" />
+      <rect x="51" y="70" width="18" height="18" rx="7" fill="#d9a07a" />
+      <ellipse cx="60" cy="58" rx="18" ry="21" fill="url(#skinG)" />
+      <path d="M42 52 C42 40 50 36 60 36 C70 36 78 40 78 52 C72 46 66 44 60 46 C54 44 48 46 42 52 Z" fill="#1c1c28" />
+      <circle class="eye" cx="53" cy="60" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="67" cy="60" r="2.4" fill="#1a1a24" />
+      <path d="M48 54 Q53 52 57 54 M63 54 Q67 52 72 54" fill="none" stroke="#1c1c28" stroke-width="2.2" stroke-linecap="round" />
+      <path d="M55 70 Q60 72 65 70" fill="none" stroke="#8a4a3a" stroke-width="2.4" stroke-linecap="round" />
+      <path d="M96 88 L107 92 L107 101 C107 108 102 111 96 114 C90 111 85 108 85 101 L85 92 Z" fill="#2cf5a0" stroke="#14805a" stroke-width="1.6" />
+      <path d="M90 101 L94.5 105.5 L102 97" fill="none" stroke="#0f5a3e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+
+    <!-- 雲端架構師安娜：盤髮、紫色西裝外套、雲朵 -->
+    <g v-else-if="art === 'cloud'">
+      <path d="M10 124 C10 98 32 88 60 88 C88 88 110 98 110 124 Z" fill="#6b4fd1" />
+      <path d="M46 88 L60 106 L74 88 L68 86 L60 96 L52 86 Z" fill="#f4f1ff" />
+      <rect x="51" y="70" width="18" height="22" rx="7" fill="#e0a57d" />
+      <circle cx="60" cy="22" r="9" fill="#4a2a2e" />
+      <ellipse cx="60" cy="56" rx="19" ry="22" fill="url(#skinG)" />
+      <path d="M40 52 C38 34 48 28 60 28 C72 28 82 34 80 52 C74 42 66 38 60 40 C54 38 46 42 40 52 Z" fill="#4a2a2e" />
+      <circle class="eye" cx="52" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="68" cy="58" r="2.6" fill="#2a1a22" />
+      <path d="M45 53 Q51 51 56 53 M64 53 Q69 51 75 53" fill="none" stroke="#4a2a2e" stroke-width="2" stroke-linecap="round" />
+      <path d="M54 68 Q60 72 66 68" fill="none" stroke="#b5475c" stroke-width="2.4" stroke-linecap="round" />
+      <circle cx="41" cy="64" r="2" fill="#ffd36b" />
+      <circle cx="79" cy="64" r="2" fill="#ffd36b" />
+      <g class="bob">
+        <path d="M86 108 C79 108 79 98 87 98 C88 91 98 90 100 97 C108 96 109 108 101 108 Z" fill="#e8f1ff" stroke="#6b8fd6" stroke-width="1.6" />
+        <path d="M93 104 L93 100 M93 100 L90.5 102.5 M93 100 L95.5 102.5" fill="none" stroke="#6b8fd6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+      </g>
+    </g>
+
+    <!-- 組長阿誠：捲起袖子的藍襯衫、識別證掛繩 -->
+    <g v-else-if="art === 'teamlead'">
+      <path d="M8 124 C8 98 30 88 60 88 C90 88 112 98 112 124 Z" fill="#4f7cac" />
+      <path d="M46 88 L60 100 L74 88 L68 86 L60 94 L52 86 Z" fill="#dce8f5" />
+      <path d="M50 90 L58 108 M70 90 L62 108" stroke="#d23a4e" stroke-width="2.4" />
+      <rect x="53" y="106" width="14" height="11" rx="2" fill="#f4f6fb" stroke="#9aa6b8" stroke-width="1.2" />
+      <rect x="56" y="109" width="5" height="5" rx="1" fill="#7fb3e8" />
+      <rect x="51" y="70" width="18" height="18" rx="7" fill="#d9a07a" />
+      <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
+      <path d="M38 48 C38 30 48 24 60 24 C74 24 84 30 82 48 C80 40 76 36 70 34 L66 38 L62 33 L56 38 L52 33 L46 38 C42 40 40 44 38 48 Z" fill="#20212e" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <path d="M46 52 Q52 49 57 52 M63 52 Q68 49 74 52" fill="none" stroke="#20212e" stroke-width="2.4" stroke-linecap="round" />
+      <path d="M52 68 Q60 76 68 68" fill="none" stroke="#8a4a3a" stroke-width="2.4" stroke-linecap="round" />
+      <path d="M92 96 L100 104 L110 90" fill="none" stroke="#2cf5a0" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+
+    <!-- 課長老李：地中海髮型、咖啡色西裝、綠領帶、文件夾 -->
+    <g v-else-if="art === 'section'">
+      <path d="M6 124 C6 98 30 88 60 88 C90 88 114 98 114 124 Z" fill="#6b4a2b" />
+      <path d="M44 88 L60 110 L76 88 L70 86 L60 96 L50 86 Z" fill="#f4f6fb" />
+      <path d="M57 96 L63 96 L66 124 L54 124 Z" fill="#2f8a5c" />
+      <path d="M57 96 L63 96 L61.5 102 L58.5 102 Z" fill="#226b47" />
+      <rect x="51" y="70" width="18" height="22" rx="7" fill="#d9a07a" />
+      <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
+      <path d="M39 58 C37 48 40 42 44 40 L46 54 Z M81 58 C83 48 80 42 76 40 L74 54 Z" fill="#6f6a66" />
+      <path d="M50 36 Q60 32 70 36" fill="none" stroke="#fff3e6" stroke-width="2.4" stroke-linecap="round" opacity="0.7" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <path d="M46 52 Q52 50 57 52 M63 52 Q68 50 74 52" fill="none" stroke="#6f6a66" stroke-width="2.4" stroke-linecap="round" />
+      <path d="M50 66 Q55 64 60 66 Q65 64 70 66" fill="none" stroke="#4a3a32" stroke-width="2.6" stroke-linecap="round" />
+      <path d="M54 71 Q60 74 66 71" fill="none" stroke="#8a4a3a" stroke-width="2.2" stroke-linecap="round" />
+      <rect x="86" y="92" width="20" height="24" rx="2" fill="#c9a26b" />
+      <rect x="89" y="96" width="14" height="17" fill="#fff" />
+      <path d="M91 101 L101 101 M91 105 L101 105 M91 109 L97 109" stroke="#9aa6b8" stroke-width="1.4" stroke-linecap="round" />
+      <rect x="92" y="89" width="8" height="5" rx="1.5" fill="#6b7280" />
+    </g>
+
+    <!-- 業務經理趙姐：俐落短髮、海軍藍西裝、上升的業績長條 -->
+    <g v-else-if="art === 'salesmgr'">
+      <path d="M10 124 C10 98 32 88 60 88 C88 88 110 98 110 124 Z" fill="#24365e" />
+      <path d="M46 88 L60 104 L74 88 L68 86 L60 94 L52 86 Z" fill="#fdf2f4" />
+      <circle cx="60" cy="98" r="2.4" fill="#ffd36b" />
+      <rect x="51" y="70" width="18" height="22" rx="7" fill="#e0a57d" />
+      <path d="M38 60 C34 36 46 24 60 24 C74 24 86 36 82 60 C80 66 76 66 76 62 L76 48 C66 44 54 44 44 48 L44 62 C44 66 40 66 38 60 Z" fill="#2a1a14" />
+      <ellipse cx="60" cy="56" rx="19" ry="22" fill="url(#skinG)" />
+      <path d="M40 50 C42 32 54 28 64 30 C74 32 80 40 80 48 C72 38 58 36 48 42 C44 44 42 46 40 50 Z" fill="#2a1a14" />
+      <circle class="eye" cx="52" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="68" cy="58" r="2.6" fill="#2a1a22" />
+      <path d="M46 53 Q51 51 56 53 M64 53 Q69 51 74 53" fill="none" stroke="#2a1a14" stroke-width="2" stroke-linecap="round" />
+      <path d="M53 68 Q60 73 67 68" fill="none" stroke="#c03a52" stroke-width="2.6" stroke-linecap="round" />
+      <rect x="86" y="102" width="5" height="12" rx="1" fill="#38d6ff" />
+      <rect x="94" y="96" width="5" height="18" rx="1" fill="#2cf5a0" />
+      <rect x="102" y="89" width="5" height="25" rx="1" fill="#ffd36b" />
+    </g>
+
+    <!-- 財務長周姐：灰黑盤髮、細框眼鏡、深綠西裝、金幣 -->
+    <g v-else-if="art === 'cfo'">
+      <path d="M10 124 C10 98 32 88 60 88 C88 88 110 98 110 124 Z" fill="#1f4d3e" />
+      <path d="M46 88 L60 104 L74 88 L68 86 L60 94 L52 86 Z" fill="#f4f6fb" />
+      <path d="M52 100 Q60 106 68 100" fill="none" stroke="#f4e3b0" stroke-width="2" />
+      <rect x="51" y="70" width="18" height="22" rx="7" fill="#e0a57d" />
+      <ellipse cx="60" cy="23" rx="12" ry="7" fill="#4a4550" />
+      <ellipse cx="60" cy="56" rx="19" ry="22" fill="url(#skinG)" />
+      <path d="M40 52 C38 34 48 28 60 28 C72 28 82 34 80 52 C76 40 68 36 60 38 C52 36 44 40 40 52 Z" fill="#4a4550" />
+      <path d="M48 32 Q56 30 62 32" fill="none" stroke="#a7a2ad" stroke-width="2" stroke-linecap="round" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <rect x="44" y="53" width="15" height="10" rx="3" fill="none" stroke="#b78b22" stroke-width="1.8" />
+      <rect x="61" y="53" width="15" height="10" rx="3" fill="none" stroke="#b78b22" stroke-width="1.8" />
+      <path d="M59 57 L61 57" stroke="#b78b22" stroke-width="1.8" />
+      <path d="M55 69 Q60 72 65 69" fill="none" stroke="#b5475c" stroke-width="2.4" stroke-linecap="round" />
+      <g class="coin">
+        <circle cx="100" cy="102" r="9" fill="#ffd36b" stroke="#b78b22" stroke-width="1.4" />
+        <path d="M100 96 L100 108 M96.5 99 Q100 97 103.5 99 Q100 102 96.5 105 Q100 107 103.5 105" fill="none" stroke="#b78b22" stroke-width="1.4" stroke-linecap="round" />
+      </g>
+    </g>
+
     <!-- AI 助理 -->
     <g v-else-if="art === 'ai'">
       <path d="M22 124 C22 100 40 92 60 92 C80 92 98 100 98 124 Z" fill="url(#metalG)" />

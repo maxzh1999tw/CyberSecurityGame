@@ -14,7 +14,9 @@ export const COMPANY = {
   /** 警戒值至少要多少，才查得到駭客的任務（威脅情資） */
   intelAlert: 6,
   /** 人力市場每一類有幾位候選人（遠多於需要，讓玩家挑） */
-  marketSize: { staff: 10, exec: 4, ai: 4, it: 4, infra: 5, db: 4, backup: 4 } as Record<HireKind, number>,
+  marketSize: { staff: 10, exec: 8, ai: 8, it: 8, infra: 8, db: 4, backup: 4 } as Record<HireKind, number>,
+  /** 每一類每個星級至少幾位（沒寫就是 1） */
+  marketPerTier: { exec: 2, ai: 2, it: 2, infra: 2 } as Partial<Record<HireKind, number>>,
   /** 每回合收益至少要多少才能開業 */
   minNet: 15,
   /** 每層最多幾個節點 */
@@ -574,43 +576,50 @@ export const DEFAULT_BRAND = { name: '我的公司', logo: 'building-2', color: 
 
 // ───── 候選人的名字 ─────
 
-/** 人物：名字和頭像是固定的一組，數值（等級、薪水、產值）另外隨機抽 */
+/** 人物：名字、頭像、星級是固定的一組；薪水、產值、底下的牌另外隨機抽 */
 export interface Persona {
   name: string
   art: string
+  tier: Tier
   /** 弱點池與插圖用的角色（一般員工才需要分業務型、技術型） */
   role?: NodeRole
-  /** 這個人只會以這個等級以上／以下出現（名字要說得通，例如新人不會是王牌） */
-  minTier?: Tier
-  maxTier?: Tier
 }
 
 export const PERSONAS: Record<'staff' | 'exec' | 'it', Persona[]> = {
   staff: [
-    { name: '客服小美', art: 'sales', role: 'sales' },
-    { name: '工程師阿明', art: 'engineer', role: 'engineer' },
-    { name: '會計王姐', art: 'clerk', role: 'sales' },
-    { name: '行銷小安', art: 'marketer', role: 'sales' },
-    { name: '前端阿傑', art: 'dev', role: 'engineer' },
-    { name: '新人小柔', art: 'newhire', role: 'sales', maxTier: 1 },
-    { name: '倉管老陳', art: 'worker', role: 'engineer' },
-    { name: '講師林老師', art: 'teacher', role: 'sales' },
-    { name: '駐廠護理師小芳', art: 'nurse', role: 'sales' },
-    { name: '工讀生小傑', art: 'student', role: 'sales', maxTier: 1 },
-    { name: '研究員阿哲', art: 'doctor', role: 'engineer', minTier: 2 },
+    { name: '新人小柔', art: 'newhire', tier: 1, role: 'sales' },
+    { name: '工讀生小傑', art: 'student', tier: 1, role: 'sales' },
+    { name: '客服小美', art: 'sales', tier: 1, role: 'sales' },
+    { name: '行銷小安', art: 'marketer', tier: 1, role: 'sales' },
+    { name: '會計王姐', art: 'clerk', tier: 2, role: 'sales' },
+    { name: '前端阿傑', art: 'dev', tier: 2, role: 'engineer' },
+    { name: '倉管老陳', art: 'worker', tier: 2, role: 'engineer' },
+    { name: '講師林老師', art: 'teacher', tier: 2, role: 'sales' },
+    { name: '工程師阿明', art: 'engineer', tier: 3, role: 'engineer' },
+    { name: '駐廠護理師小芳', art: 'nurse', tier: 3, role: 'sales' },
+    { name: '研究員阿哲', art: 'doctor', tier: 3, role: 'engineer' },
   ],
   exec: [
-    { name: '王經理', art: 'boss' },
-    { name: '陳廠長', art: 'plantboss' },
-    { name: '林總監', art: 'director', minTier: 2 },
-    { name: '吳執行長', art: 'ceo', minTier: 2 },
-    { name: '黃董事長', art: 'chairman', minTier: 3 },
+    { name: '組長阿誠', art: 'teamlead', tier: 1 },
+    { name: '課長老李', art: 'section', tier: 1 },
+    { name: '業務經理趙姐', art: 'salesmgr', tier: 1 },
+    { name: '王經理', art: 'boss', tier: 2 },
+    { name: '陳廠長', art: 'plantboss', tier: 2 },
+    { name: '林總監', art: 'director', tier: 2 },
+    { name: '吳執行長', art: 'ceo', tier: 3 },
+    { name: '財務長周姐', art: 'cfo', tier: 3 },
+    { name: '黃董事長', art: 'chairman', tier: 3 },
   ],
   it: [
-    { name: '老 IT 阿明', art: 'it' },
-    { name: '維運阿凱', art: 'devops' },
-    { name: '資訊室阿德', art: 'medit' },
-    { name: '資安專家大傑', art: 'itteacher', minTier: 2 },
+    { name: '網管小葉', art: 'netadmin', tier: 1 },
+    { name: '資訊助理小琪', art: 'helpdesk', tier: 1 },
+    { name: '維運阿凱', art: 'devops', tier: 1 },
+    { name: '老 IT 阿明', art: 'it', tier: 2 },
+    { name: '資訊室阿德', art: 'medit', tier: 2 },
+    { name: '系統工程師老吳', art: 'sysadmin', tier: 2 },
+    { name: '資安專家大傑', art: 'itteacher', tier: 3 },
+    { name: '資安分析師凱文', art: 'secops', tier: 3 },
+    { name: '雲端架構師安娜', art: 'cloud', tier: 3 },
   ],
 }
 
