@@ -399,6 +399,20 @@ onBeforeUnmount(() => {
   opacity: 1;
   border: 5px solid #5fd99a;
   box-shadow: 0 0 12px rgba(95, 217, 154, 0.45);
+  /* 可以出的牌：外光暈輕輕呼吸 */
+  animation: aura-breathe 2.4s ease-in-out infinite;
+}
+@keyframes aura-breathe {
+  50% {
+    box-shadow:
+      0 0 20px rgba(95, 217, 154, 0.6),
+      inset 0 0 8px rgba(95, 217, 154, 0.25);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hc.sure .aura {
+    animation: none;
+  }
 }
 .hc.maybe .aura {
   opacity: 1;

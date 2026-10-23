@@ -14,7 +14,6 @@ import HelpOverlay from './HelpOverlay.vue'
 import IntroOverlay from './IntroOverlay.vue'
 import MissionPanel from './MissionPanel.vue'
 import MobileInfoPopover from './MobileInfoPopover.vue'
-import StageTrack from './StageTrack.vue'
 import NodeTip from './NodeTip.vue'
 import PlayerHud from './PlayerHud.vue'
 import ResultOverlay from './ResultOverlay.vue'
@@ -44,7 +43,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 <template>
   <div class="game felt" @pointerdown.capture="fastForward" @click="ui.menuOpen && (ui.menuOpen = false)">
-    <aside class="rail left"><MissionPanel /><StageTrack /><ControlledList /></aside>
+    <aside class="rail left"><MissionPanel /><ControlledList /></aside>
     <aside class="rail right">
       <div class="gearbox"><GameMenu @click.stop /></div>
       <CompanyPanel />
@@ -88,6 +87,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   left: 0;
   width: 350px;
   border-right: 2px solid #283246;
+  /* 側欄像一塊壓在桌面上的板子：內緣一道反光、外側投影 */
+  box-shadow:
+    1px 0 0 rgba(255, 255, 255, 0.05),
+    10px 0 26px rgba(0, 0, 0, 0.32);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -96,6 +99,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 .rail.right {
   right: 0;
   border-left: 2px solid #283246;
+  box-shadow:
+    -1px 0 0 rgba(255, 255, 255, 0.05),
+    -10px 0 26px rgba(0, 0, 0, 0.32);
   display: flex;
   flex-direction: column;
   gap: 20px;

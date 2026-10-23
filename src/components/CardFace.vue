@@ -23,9 +23,11 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
 
 <template>
   <div class="card" :class="['cat-' + def.cat, { dead }]">
+    <i class="frame"></i>
     <div class="art">
       <div class="pat"></div>
       <Icon :name="def.icon" :size="82" :stroke="1.6" class="art-icon" />
+      <div class="gloss"></div>
       <div class="stage">{{ def.stage }}</div>
     </div>
 
@@ -62,12 +64,48 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
   height: 340px;
   border-radius: 16px;
   border: 6px solid var(--cc);
-  background: linear-gradient(180deg, #f8f1df, var(--paper2));
+  /* 紙卡：細緻纖維紋理，下緣微微泛黃 */
+  background:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .33  0 0 0 0 .16  0 0 0 .09 0'/></filter><rect width='120' height='120' filter='url(%23p)'/></svg>"),
+    radial-gradient(ellipse 120% 70% at 50% 100%, rgba(150, 110, 50, 0.16), transparent 70%),
+    linear-gradient(180deg, #fbf5e6, #efe4c8 60%, var(--paper2));
   box-shadow:
-    0 10px 22px rgba(0, 0, 0, 0.55),
+    0 2px 0 rgba(0, 0, 0, 0.35),
+    0 12px 24px rgba(0, 0, 0, 0.5),
     inset 0 0 0 2px rgba(255, 255, 255, 0.6),
     0 0 0 2px var(--gold3);
   color: var(--ink);
+}
+/* 外框的金屬斜面：左上受光、右下背光，只畫在邊框那一圈 */
+.frame {
+  position: absolute;
+  inset: -6px;
+  z-index: 2;
+  border-radius: 16px;
+  padding: 6px;
+  background: linear-gradient(
+    150deg,
+    rgba(255, 255, 255, 0.55),
+    rgba(255, 255, 255, 0.08) 30%,
+    rgba(0, 0, 0, 0) 55%,
+    rgba(0, 0, 0, 0.38)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+.frame::after {
+  /* 邊框內緣的一道細金線 */
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 228, 160, 0.45);
 }
 .cat-recon {
   --cc: var(--c-recon);
@@ -96,16 +134,29 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
   display: grid;
   place-items: center;
   background: linear-gradient(180deg, color-mix(in srgb, var(--cc) 70%, #1a2030), var(--cd));
+  /* 圖案區像嵌進卡片的窗：上緣內陰影、四周暗角 */
+  box-shadow:
+    inset 0 8px 14px rgba(0, 0, 0, 0.32),
+    inset 0 0 26px rgba(0, 0, 0, 0.28);
 }
 .pat {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 55%, rgba(255, 255, 255, 0.16), transparent 62%);
+  background:
+    radial-gradient(circle at 50% 55%, rgba(255, 255, 255, 0.2), transparent 58%),
+    radial-gradient(circle, rgba(255, 255, 255, 0.07) 1px, transparent 1.6px) 0 0 / 12px 12px;
 }
 .art-icon {
   position: relative;
   color: #fbf3dc;
-  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.3));
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.3)) drop-shadow(0 0 10px rgba(255, 244, 210, 0.22));
+}
+/* 圖案區上半部的玻璃反光 */
+.gloss {
+  position: absolute;
+  inset: 0 0 45% 0;
+  background: linear-gradient(172deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.04) 55%, transparent);
+  pointer-events: none;
 }
 .stage {
   position: absolute;
@@ -131,10 +182,18 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
   font-weight: 900;
   letter-spacing: 1px;
   color: #fff;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
-  background: var(--cd);
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.45),
+    0 0 8px rgba(0, 0, 0, 0.25);
+  /* 名稱橫幅：中間稍亮的緞帶，上下金邊 */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.22)),
+    var(--cd);
   border-top: 3px solid var(--gold);
-  border-bottom: 3px solid var(--gold);
+  border-bottom: 3px solid var(--gold3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 238, 190, 0.35),
+    0 3px 5px rgba(60, 40, 10, 0.25);
 }
 
 .body {
@@ -202,8 +261,19 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
   clip-path: inherit;
   background: linear-gradient(160deg, #5aa2f0, #1c4fb0 70%);
 }
+.cost::after {
+  /* 寶石的反光：左上一點亮光、下半部的切面 */
+  content: '';
+  position: absolute;
+  inset: 4px;
+  clip-path: inherit;
+  background:
+    radial-gradient(circle at 34% 22%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 52%, rgba(0, 20, 60, 0.28) 52%);
+}
 .cost span {
   position: relative;
+  z-index: 1;
   font-family: var(--font-num);
   font-weight: 700;
   font-size: 38px;
@@ -229,9 +299,11 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
   align-items: center;
   gap: 4px;
   color: #fff;
-  background: #b23a2c;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 55%), #b23a2c;
   border: 3px solid var(--gold2);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.55);
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.55),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2);
 }
 .noise span {
   font-family: var(--font-num);
@@ -240,7 +312,7 @@ const noiseShown = computed(() => props.noise ?? def.value.noise)
   line-height: 1;
 }
 .noise.quiet {
-  background: #2c8f66;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 55%), #2c8f66;
 }
 .noise.halved {
   outline: 3px solid #86e2b6;

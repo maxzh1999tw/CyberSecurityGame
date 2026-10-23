@@ -30,6 +30,13 @@ const kindTag = computed(() => {
 
 const n = computed(() => props.node)
 
+// 待機動畫的相位與眨眼節奏：依節點 id 固定錯開，同一層的人不會同時眨眼
+const idle = computed(() => {
+  let h = 0
+  for (const ch of props.node.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return { '--phase': `${-((h % 6000) / 1000)}s`, '--blink': `${4.4 + ((h >> 8) % 23) / 10}s` }
+})
+
 // 命中時疊在節點上的特效種類（capture / infect / pulse / paralyze / fail / recapture / restore）
 const fxType = computed(() => ui.nodeFx[props.node.id] ?? '')
 const BUGS = Array.from({ length: 8 }, (_, i) => {
@@ -159,7 +166,7 @@ function leave() {
     @pointerleave="leave"
   >
     <div class="head">
-      <div class="avatar">
+      <div class="avatar" :style="idle">
         <NodeArt :art="n.art ?? n.role" />
         <div v-if="locked" class="lock"><Icon name="lock" :size="16" :stroke="2.6" /></div>
         <div v-if="n.controlled" class="hack"><Icon name="skull" :size="15" :stroke="2.6" /></div>
@@ -696,6 +703,15 @@ function leave() {
 }
 .infected .avatar {
   animation: glitch 3.4s infinite;
+}
+/* 被你控制的節點：頭像偶爾閃一下雜訊（比病毒輕、間隔長） */
+.ctrl:not(.infected) .avatar {
+  animation: glitch 9s var(--phase, 0s) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ctrl:not(.infected) .avatar {
+    animation: none;
+  }
 }
 .infected .name {
   animation: glitch-text 3.4s infinite;

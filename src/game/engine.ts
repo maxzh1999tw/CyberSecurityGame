@@ -223,7 +223,11 @@ export const infras = (s: GameState) => s.nodes.filter(isInfra)
 export const ais = (s: GameState) => s.nodes.filter(isAi)
 export const ctrlCount = (s: GameState) => s.nodes.filter((n) => n.controlled).length
 const outerCtrl = (s: GameState) => s.nodes.some((n) => n.layer === 0 && n.controlled)
-const innerCtrl = (s: GameState) => s.nodes.some((n) => n.layer === 1 && n.controlled)
+/**
+ * 這一層的一般入口是否已打開：控制前一層或更深的任一節點。
+ * 一旦打進較深的層，外面的層就不會再鎖上（例如外圍被奪回、但內網還在手上）。
+ */
+const layerOpen = (s: GameState, layer: number) => s.nodes.some((n) => n.controlled && n.layer >= layer - 1)
 const empCtrl = (s: GameState) => s.nodes.some((n) => isEmployee(n) && n.controlled)
 const nonItEmpCtrl = (s: GameState) => s.nodes.some((n) => isEmployee(n) && n.role !== 'it' && n.controlled)
 export const infraCtrl = (s: GameState) => infras(s).some((n) => n.controlled)
@@ -236,12 +240,9 @@ const itDown = (s: GameState) => {
   return it.controlled || it.paralyzed > 0
 }
 
-/** 外圍可直接偵查；控制某層會開放下一層，且已控制的深層也可偵查同層。 */
+/** 外圍可直接偵查；控制某層會開放下一層，控制更深的層也會讓外面的層保持開放。 */
 export function canRecon(s: GameState, n: GameNode): boolean {
-  if (n.layer === 0) return true
-  return s.nodes.some(
-    (source) => source.controlled && (source.layer === n.layer || source.layer === n.layer - 1),
-  )
+  return n.layer === 0 || layerOpen(s, n.layer)
 }
 
 /** 依畫面方向擴散：同層或下方一層（核心 → 內網 → 外圍），不能向上。 */
@@ -279,14 +280,14 @@ function reach(s: GameState, H: Has, n: GameNode): Tri {
   // 已受控節點可直接再攻擊以鞏固控制，不再依賴當初的入口仍然可達。
   if (n.controlled) return 'Y'
   if (n.layer === 0) return 'Y'
-  const outer = yn(outerCtrl(s))
   if (n.layer === 1) {
-    if (n.role === 'infra') return or(outer, H(n, 'remote'))
-    return outer
+    const open = yn(layerOpen(s, 1))
+    if (n.role === 'infra') return or(open, H(n, 'remote'))
+    return open
   }
-  const inner = yn(innerCtrl(s))
+  const inner = yn(layerOpen(s, 2))
   // 任一基礎設施有「自由海域」，外圍就能跳過內網
-  const sea = and(outer, or(...infras(s).map((i) => H(i, 'openSea'))))
+  const sea = and(yn(outerCtrl(s)), or(...infras(s).map((i) => H(i, 'openSea'))))
   if (n.role === 'db') {
     return or(
       inner,
@@ -326,10 +327,10 @@ function entriesOn(n: GameNode, vulns: VulnId[]): Entry[] {
 /** 實際走進這個節點時，用到的「規則類」弱點（成功時要一併翻開） */
 function reachUsed(s: GameState, n: GameNode): Entry[] {
   if (n.controlled) return []
-  if (n.layer === 1 && isInfra(n) && !outerCtrl(s) && effective(n, 'remote')) {
+  if (n.layer === 1 && isInfra(n) && !layerOpen(s, 1) && effective(n, 'remote')) {
     return [{ node: n.id, vuln: 'remote' }]
   }
-  if (n.layer === 2 && !innerCtrl(s)) {
+  if (n.layer === 2 && !layerOpen(s, 2)) {
     const candidates: Entry[] = []
     if (outerCtrl(s)) {
       for (const i of infras(s)) if (effective(i, 'openSea')) candidates.push({ node: i.id, vuln: 'openSea' })

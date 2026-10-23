@@ -34,8 +34,8 @@ defineProps<{ art: string }>()
       <path d="M36 58 C34 30 48 20 62 20 C78 20 88 32 84 58 L84 84 C80 88 74 84 74 78 L74 52 C66 48 52 46 46 38 C44 46 44 54 46 58 L46 78 C46 84 40 88 36 84 Z" fill="#4a2a3e" />
       <ellipse cx="60" cy="56" rx="19" ry="22" fill="url(#skinG)" />
       <path d="M40 50 C44 30 56 28 62 30 C74 32 80 40 80 50 C74 42 66 40 58 40 C50 40 44 44 40 50 Z" fill="#4a2a3e" />
-      <circle cx="52" cy="58" r="2.6" fill="#2a1a22" />
-      <circle cx="68" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="52" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="68" cy="58" r="2.6" fill="#2a1a22" />
       <path d="M53 68 Q60 74 67 68" fill="none" stroke="#b5475c" stroke-width="2.4" stroke-linecap="round" />
       <ellipse cx="47" cy="65" rx="4" ry="2.4" fill="#ff9aa6" opacity="0.5" />
       <ellipse cx="73" cy="65" rx="4" ry="2.4" fill="#ff9aa6" opacity="0.5" />
@@ -54,8 +54,8 @@ defineProps<{ art: string }>()
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M38 50 C36 30 48 22 62 22 C76 22 86 32 82 50 C78 40 70 36 60 38 C50 36 42 40 38 50 Z" fill="#20212e" />
       <path d="M42 34 L50 26 L54 34 Z" fill="#20212e" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <rect x="43" y="52" width="17" height="13" rx="5" fill="rgba(160,220,255,.18)" stroke="#e8eefc" stroke-width="2.4" />
       <rect x="60" y="52" width="17" height="13" rx="5" fill="rgba(160,220,255,.18)" stroke="#e8eefc" stroke-width="2.4" />
       <path d="M59 58 L61 58" stroke="#e8eefc" stroke-width="2.4" />
@@ -73,8 +73,8 @@ defineProps<{ art: string }>()
       <rect x="51" y="70" width="18" height="22" rx="7" fill="#d9a07a" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M39 52 C38 36 46 30 60 30 C74 30 82 36 81 52 C78 44 74 42 70 40 C64 44 54 44 50 40 C46 42 42 46 39 52 Z" fill="#aeb6c6" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <path d="M46 52 Q52 49 57 52 M63 52 Q68 49 74 52" fill="none" stroke="#7d8696" stroke-width="2.4" stroke-linecap="round" />
       <path d="M53 70 Q60 74 67 70" fill="none" stroke="#8a4a3a" stroke-width="2.4" stroke-linecap="round" />
       <path d="M96 100 l8 -8 l8 8 l-8 8 Z" fill="#ffd36b" stroke="#b78b22" stroke-width="1.4" />
@@ -89,14 +89,16 @@ defineProps<{ art: string }>()
       <rect x="51" y="70" width="18" height="22" rx="7" fill="#d9a07a" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M39 54 C36 40 44 31 60 31 C76 31 84 40 81 54 C79 46 76 43 72 42 C66 38 54 38 48 42 C44 43 41 46 39 54 Z" fill="#eef1f6" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <circle cx="52" cy="58" r="6" fill="none" stroke="#3a3f4c" stroke-width="1.8" />
       <circle cx="68" cy="58" r="6" fill="none" stroke="#3a3f4c" stroke-width="1.8" />
       <path d="M58 58 L62 58" stroke="#3a3f4c" stroke-width="1.8" />
       <path d="M50 70 Q60 66 70 70 Q60 76 50 70 Z" fill="#eef1f6" />
-      <circle cx="104" cy="100" r="8" fill="#ffd36b" stroke="#b78b22" stroke-width="1.4" />
-      <path d="M104 95 L104 105 M101 97.5 Q104 96 107 97.5 Q104 100 101 102.5 Q104 104 107 102.5" fill="none" stroke="#b78b22" stroke-width="1.4" stroke-linecap="round" />
+      <g class="coin">
+        <circle cx="104" cy="100" r="8" fill="#ffd36b" stroke="#b78b22" stroke-width="1.4" />
+        <path d="M104 95 L104 105 M101 97.5 Q104 96 107 97.5 Q104 100 101 102.5 Q104 104 107 102.5" fill="none" stroke="#b78b22" stroke-width="1.4" stroke-linecap="round" />
+      </g>
     </g>
 
     <!-- IT 管理員 -->
@@ -110,15 +112,17 @@ defineProps<{ art: string }>()
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M36 52 C34 30 48 20 62 20 C76 20 88 30 84 52 L80 50 C76 40 70 34 60 34 C50 34 44 40 40 50 Z" fill="#1c1c28" />
       <path d="M36 44 C40 34 46 30 54 28 L60 22" fill="none" stroke="#38d6ff" stroke-width="2" opacity="0.6" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <circle cx="52" cy="58" r="8.5" fill="none" stroke="#2cf5a0" stroke-width="2.2" />
       <circle cx="68" cy="58" r="8.5" fill="none" stroke="#2cf5a0" stroke-width="2.2" />
       <path d="M60.5 57 L59.5 57" stroke="#2cf5a0" stroke-width="2.2" />
       <path d="M55 69 L65 69" stroke="#8a4a3a" stroke-width="2.6" stroke-linecap="round" />
       <g transform="translate(86 96)">
+        <g class="swing">
         <circle r="7" fill="none" stroke="#ffd36b" stroke-width="2.4" />
         <path d="M7 0 L20 0 M14 0 L14 5 M19 0 L19 4" stroke="#ffd36b" stroke-width="2.4" stroke-linecap="round" />
+        </g>
       </g>
     </g>
 
@@ -132,10 +136,10 @@ defineProps<{ art: string }>()
       <rect x="51" y="70" width="18" height="22" rx="7" fill="#e0a57d" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M38 52 C34 32 44 20 60 20 C76 20 86 32 82 52 C80 42 74 36 66 38 C60 30 50 32 44 38 C40 42 38 46 38 52 Z" fill="#7a4a2a" />
-      <circle cx="52" cy="58" r="3" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="3" fill="#1a1a24" />
-      <circle cx="53" cy="57" r="1" fill="#fff" />
-      <circle cx="69" cy="57" r="1" fill="#fff" />
+      <circle class="eye" cx="52" cy="58" r="3" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="3" fill="#1a1a24" />
+      <circle class="eye" cx="53" cy="57" r="1" fill="#fff" />
+      <circle class="eye" cx="69" cy="57" r="1" fill="#fff" />
       <path d="M52 66 Q60 76 68 66 Z" fill="#fff" stroke="#b5475c" stroke-width="2" stroke-linejoin="round" />
       <path d="M96 22 l3 8 l8 1 l-6 5 l2 8 l-7 -4 l-7 4 l2 -8 l-6 -5 l8 -1 Z" fill="#ffd36b" opacity="0.9" />
     </g>
@@ -150,8 +154,8 @@ defineProps<{ art: string }>()
       <circle cx="60" cy="25" r="10" fill="#5a3f34" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M39 54 C37 36 46 30 60 30 C74 30 83 36 81 54 C78 44 72 39 60 39 C48 39 42 44 39 54 Z" fill="#5a3f34" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <path d="M44 57 Q51 65 58 57 Z M62 57 Q69 65 76 57 Z" fill="rgba(160,220,255,.18)" stroke="#7a3b2e" stroke-width="2.2" stroke-linejoin="round" />
       <path d="M58 57 L62 57" stroke="#7a3b2e" stroke-width="2.2" />
       <path d="M54 70 Q60 74 66 70" fill="none" stroke="#a9604a" stroke-width="2.4" stroke-linecap="round" />
@@ -171,15 +175,17 @@ defineProps<{ art: string }>()
       <rect x="51" y="70" width="18" height="22" rx="7" fill="#d9a07a" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M43 66 Q60 86 77 66 Q73 79 60 80 Q47 79 43 66 Z" fill="#6b4a3a" opacity="0.28" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <path d="M46 52 L57 51 M63 51 L74 52" stroke="#3a2a22" stroke-width="3" stroke-linecap="round" />
       <path d="M54 70 Q60 73 66 70" fill="none" stroke="#8a4a3a" stroke-width="2.4" stroke-linecap="round" />
       <path d="M38 46 C38 26 48 19 60 19 C72 19 82 26 82 46 Z" fill="#ffc83a" />
       <rect x="57" y="19" width="6" height="25" rx="3" fill="#e0a817" />
       <rect x="32" y="43" width="56" height="7" rx="3.5" fill="#e0a817" />
-      <path d="M100 94 l7 4 v8 l-7 4 l-7 -4 v-8 Z" fill="#c9d3e6" stroke="#6f7d98" stroke-width="1.4" />
-      <circle cx="100" cy="102" r="2.6" fill="#6f7d98" />
+      <g class="spin">
+        <path d="M100 94 l7 4 v8 l-7 4 l-7 -4 v-8 Z" fill="#c9d3e6" stroke="#6f7d98" stroke-width="1.4" />
+        <circle cx="100" cy="102" r="2.6" fill="#6f7d98" />
+      </g>
     </g>
 
     <!-- 廠長：白色安全帽、襯衫領帶、八字鬍、夾板 -->
@@ -192,8 +198,8 @@ defineProps<{ art: string }>()
       <rect x="51" y="70" width="18" height="22" rx="7" fill="#d9a07a" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M40 58 C39 52 40 48 42 45 L45 58 Z M80 58 C81 52 80 48 78 45 L75 58 Z" fill="#8a919e" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <path d="M51 67 Q56 63 60 66 Q64 63 69 67 Q64 70 60 68 Q56 70 51 67 Z" fill="#4a4f5b" />
       <path d="M55 73 Q60 75 65 73" fill="none" stroke="#8a4a3a" stroke-width="2.2" stroke-linecap="round" />
       <path d="M38 46 C38 26 48 19 60 19 C72 19 82 26 82 46 Z" fill="#f4f6fb" />
@@ -214,15 +220,15 @@ defineProps<{ art: string }>()
       <ellipse cx="60" cy="56" rx="19" ry="22" fill="url(#skinG)" />
       <path d="M40 52 C39 34 48 26 60 26 C72 26 82 34 81 50 C76 40 66 36 56 38 C48 40 43 44 40 52 Z" fill="#c2733a" />
       <circle cx="77" cy="31" r="3.6" fill="#ff5fa2" />
-      <circle cx="52" cy="58" r="2.6" fill="#2a1a22" />
-      <circle cx="68" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="52" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="68" cy="58" r="2.6" fill="#2a1a22" />
       <path d="M53 67 Q60 75 67 67" fill="none" stroke="#b5475c" stroke-width="2.4" stroke-linecap="round" />
       <ellipse cx="47" cy="65" rx="4" ry="2.4" fill="#ff9aa6" opacity="0.5" />
       <ellipse cx="73" cy="65" rx="4" ry="2.4" fill="#ff9aa6" opacity="0.5" />
       <circle cx="41" cy="67" r="2.2" fill="#ffd36b" />
       <circle cx="79" cy="67" r="2.2" fill="#ffd36b" />
       <rect x="84" y="90" width="15" height="25" rx="3" fill="#1b2438" stroke="#c9b8ff" stroke-width="1.6" />
-      <path d="M91.5 106 C86 101 88 96 91.5 99 C95 96 97 101 91.5 106 Z" fill="#ff5fa2" />
+      <path class="beat" d="M91.5 106 C86 101 88 96 91.5 99 C95 96 97 101 91.5 106 Z" fill="#ff5fa2" />
     </g>
 
     <!-- 新創工程師：帽 T、掛在脖子上的耳機、亂髮、咖啡 -->
@@ -237,10 +243,12 @@ defineProps<{ art: string }>()
       <rect x="75" y="78" width="11" height="15" rx="5" fill="#ff6f3c" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M38 50 C34 30 46 20 60 20 C76 20 88 30 82 50 L78 42 L74 48 L70 38 L64 44 L58 36 L52 44 L46 38 L42 48 Z" fill="#2e2a3a" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <path d="M47 63 Q52 65 56 63 M64 63 Q68 65 73 63" fill="none" stroke="#b98a6a" stroke-width="1.6" stroke-linecap="round" />
       <path d="M55 70 Q60 72 65 70" fill="none" stroke="#a9604a" stroke-width="2.4" stroke-linecap="round" />
+      <path class="steam" d="M90 92 q-3 -4 0 -8 q3 -4 0 -8" fill="none" stroke="#cfd6e2" stroke-width="1.8" stroke-linecap="round" />
+      <path class="steam late" d="M97 92 q-3 -4 0 -8 q3 -4 0 -8" fill="none" stroke="#cfd6e2" stroke-width="1.8" stroke-linecap="round" />
       <path d="M86 98 H102 L100 118 H88 Z" fill="#f4f6fb" />
       <rect x="85" y="95" width="18" height="4" rx="2" fill="#3a4152" />
       <rect x="87" y="104" width="14" height="6" fill="#ff6f3c" />
@@ -253,13 +261,13 @@ defineProps<{ art: string }>()
       <rect x="47" y="80" width="26" height="13" rx="6" fill="#2a3042" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M38 50 C36 30 48 22 62 22 C76 22 86 30 82 48 C80 40 74 36 64 36 C56 36 50 34 46 30 C42 36 40 42 38 50 Z" fill="#3b2a22" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <path d="M46 52 Q52 50 57 52 M63 52 Q68 50 74 52" fill="none" stroke="#3b2a22" stroke-width="2.4" stroke-linecap="round" />
       <path d="M53 68 Q61 74 68 67" fill="none" stroke="#8a4a3a" stroke-width="2.4" stroke-linecap="round" />
       <path d="M96 114 C92 106 94 96 100 90 C106 96 108 106 104 114 Z" fill="#e070ff" />
       <circle cx="100" cy="102" r="2.6" fill="#fff" />
-      <path d="M96 112 L92 118 L98 115 Z M104 112 L108 118 L102 115 Z" fill="#ff9442" />
+      <path class="flame" d="M96 112 L92 118 L98 115 Z M104 112 L108 118 L102 115 Z" fill="#ff9442" />
     </g>
 
     <!-- DevOps：毛帽、帽 T、筆電上的終端機 -->
@@ -272,12 +280,13 @@ defineProps<{ art: string }>()
       <rect x="35" y="43" width="50" height="10" rx="4" fill="#e07a2a" />
       <path d="M41 45 V51 M47 45 V51 M53 45 V51 M59 45 V51 M65 45 V51 M71 45 V51 M77 45 V51" stroke="#c9661f" stroke-width="1.6" />
       <circle cx="60" cy="18" r="5" fill="#ffd36b" />
-      <circle cx="52" cy="60" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="60" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="60" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="60" r="2.4" fill="#1a1a24" />
       <path d="M46 70 Q60 84 74 70" fill="none" stroke="#3a2a22" stroke-width="3.4" opacity="0.45" stroke-linecap="round" />
       <path d="M55 71 Q60 74 65 71" fill="none" stroke="#8a4a3a" stroke-width="2.4" stroke-linecap="round" />
       <rect x="74" y="90" width="32" height="22" rx="3" fill="#1b2438" stroke="#2cf5a0" stroke-width="1.6" />
-      <path d="M79 97 L83 100 L79 103 M86 103 H94" fill="none" stroke="#2cf5a0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M79 97 L83 100 L79 103" fill="none" stroke="#2cf5a0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      <path class="cursor" d="M86 103 H94" fill="none" stroke="#2cf5a0" stroke-width="1.8" stroke-linecap="round" />
       <rect x="70" y="112" width="40" height="4" rx="2" fill="#5a6f92" />
     </g>
 
@@ -291,8 +300,8 @@ defineProps<{ art: string }>()
       <path d="M40 52 C42 38 50 34 60 34 C70 34 78 38 80 52 C72 46 64 44 60 47 C56 44 48 46 40 52 Z" fill="#3a2630" />
       <path d="M44 36 L46 23 Q60 17 74 23 L76 36 Q60 31 44 36 Z" fill="#fff" stroke="#d6e4ea" stroke-width="1.2" />
       <path d="M60 23 V31 M56 27 H64" stroke="#e5484d" stroke-width="2.6" stroke-linecap="round" />
-      <circle cx="52" cy="58" r="2.6" fill="#2a1a22" />
-      <circle cx="68" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="52" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="68" cy="58" r="2.6" fill="#2a1a22" />
       <path d="M53 68 Q60 74 67 68" fill="none" stroke="#b5475c" stroke-width="2.4" stroke-linecap="round" />
       <ellipse cx="47" cy="65" rx="4" ry="2.4" fill="#ff9aa6" opacity="0.5" />
       <ellipse cx="73" cy="65" rx="4" ry="2.4" fill="#ff9aa6" opacity="0.5" />
@@ -308,8 +317,8 @@ defineProps<{ art: string }>()
       <rect x="51" y="70" width="18" height="22" rx="7" fill="#e0a57d" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M38 50 C36 30 48 22 62 22 C76 22 86 32 82 50 C80 42 76 38 70 36 C64 40 52 40 46 36 C42 40 40 44 38 50 Z" fill="#2a2420" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <path d="M54 69 Q60 73 66 69" fill="none" stroke="#a9604a" stroke-width="2.4" stroke-linecap="round" />
       <path d="M43 88 C38 102 44 112 54 112 M77 88 C82 102 76 112 66 112" fill="none" stroke="#3a3f4c" stroke-width="3" stroke-linecap="round" />
       <path d="M54 112 Q60 117 66 112" fill="none" stroke="#3a3f4c" stroke-width="3" />
@@ -328,8 +337,8 @@ defineProps<{ art: string }>()
       <rect x="51" y="70" width="18" height="22" rx="7" fill="#d9a07a" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M39 52 C38 36 46 30 60 30 C74 30 82 36 81 52 C78 44 74 42 70 40 C64 44 54 44 50 40 C46 42 42 46 39 52 Z" fill="#c3c9d4" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <rect x="44" y="53" width="15" height="11" rx="4" fill="none" stroke="#3a3f4c" stroke-width="2" />
       <rect x="61" y="53" width="15" height="11" rx="4" fill="none" stroke="#3a3f4c" stroke-width="2" />
       <path d="M59 57 L61 57" stroke="#3a3f4c" stroke-width="2" />
@@ -348,8 +357,8 @@ defineProps<{ art: string }>()
       <path d="M36 86 C30 52 40 26 60 26 C80 26 90 52 84 86 C80 90 76 88 76 82 L76 52 L44 52 L44 82 C44 88 40 90 36 86 Z" fill="#2a2030" />
       <ellipse cx="60" cy="56" rx="19" ry="22" fill="url(#skinG)" />
       <path d="M40 52 C40 34 50 30 60 30 C72 30 80 36 80 50 C70 46 60 42 52 36 C48 42 44 46 40 52 Z" fill="#2a2030" />
-      <circle cx="52" cy="58" r="2.6" fill="#2a1a22" />
-      <circle cx="68" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="52" cy="58" r="2.6" fill="#2a1a22" />
+      <circle class="eye" cx="68" cy="58" r="2.6" fill="#2a1a22" />
       <circle cx="52" cy="58" r="7" fill="rgba(160,220,255,.15)" stroke="#8a4a3a" stroke-width="2" />
       <circle cx="68" cy="58" r="7" fill="rgba(160,220,255,.15)" stroke="#8a4a3a" stroke-width="2" />
       <path d="M59 58 L61 58" stroke="#8a4a3a" stroke-width="2" />
@@ -369,10 +378,10 @@ defineProps<{ art: string }>()
       <rect x="51" y="70" width="18" height="22" rx="7" fill="#e0a57d" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M38 50 C34 32 44 22 60 22 C76 22 86 32 82 50 L80 40 L74 34 L70 41 L64 30 L58 39 L52 30 L48 41 L42 36 Z" fill="#1c1c28" />
-      <circle cx="52" cy="58" r="3" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="3" fill="#1a1a24" />
-      <circle cx="53" cy="57" r="1" fill="#fff" />
-      <circle cx="69" cy="57" r="1" fill="#fff" />
+      <circle class="eye" cx="52" cy="58" r="3" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="3" fill="#1a1a24" />
+      <circle class="eye" cx="53" cy="57" r="1" fill="#fff" />
+      <circle class="eye" cx="69" cy="57" r="1" fill="#fff" />
       <path d="M52 66 Q60 76 68 66 Z" fill="#fff" stroke="#b5475c" stroke-width="2" stroke-linejoin="round" />
       <rect x="68" y="63" width="10" height="5" rx="2.5" fill="#f2c79a" transform="rotate(-20 73 65.5)" />
     </g>
@@ -387,12 +396,13 @@ defineProps<{ art: string }>()
       <rect x="51" y="70" width="18" height="20" rx="7" fill="#d9a07a" />
       <ellipse cx="60" cy="56" rx="20" ry="23" fill="url(#skinG)" />
       <path d="M38 50 C36 30 48 22 62 22 C76 22 86 32 82 50 C80 42 76 38 70 36 C64 40 52 40 46 36 C42 40 40 44 38 50 Z" fill="#1c1c28" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <rect x="43" y="52" width="17" height="12" rx="2" fill="rgba(160,220,255,.15)" stroke="#1c1c28" stroke-width="2.4" />
       <rect x="60" y="52" width="17" height="12" rx="2" fill="rgba(160,220,255,.15)" stroke="#1c1c28" stroke-width="2.4" />
       <path d="M54 70 Q60 73 66 70" fill="none" stroke="#8a4a3a" stroke-width="2.4" stroke-linecap="round" />
-      <path d="M88 102 Q98 91 108 102 M92 106 Q98 100 104 106" fill="none" stroke="#38d6ff" stroke-width="2.6" stroke-linecap="round" />
+      <path class="wifi w2" d="M88 102 Q98 91 108 102" fill="none" stroke="#38d6ff" stroke-width="2.6" stroke-linecap="round" />
+      <path class="wifi w1" d="M92 106 Q98 100 104 106" fill="none" stroke="#38d6ff" stroke-width="2.6" stroke-linecap="round" />
       <circle cx="98" cy="111" r="2.8" fill="#38d6ff" />
     </g>
 
@@ -408,8 +418,8 @@ defineProps<{ art: string }>()
       <path d="M38 52 C34 30 46 22 60 22 C74 22 86 30 82 52 C80 40 72 34 60 34 C48 34 40 40 38 52 Z" fill="#4a3428" />
       <rect x="35" y="50" width="6" height="12" rx="3" fill="#1c2233" />
       <path d="M38 62 C38 70 44 72 48 70" fill="none" stroke="#1c2233" stroke-width="2" stroke-linecap="round" />
-      <circle cx="52" cy="58" r="2.4" fill="#1a1a24" />
-      <circle cx="68" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="52" cy="58" r="2.4" fill="#1a1a24" />
+      <circle class="eye" cx="68" cy="58" r="2.4" fill="#1a1a24" />
       <path d="M54 70 Q60 73 66 70" fill="none" stroke="#8a4a3a" stroke-width="2.4" stroke-linecap="round" />
       <rect x="88" y="94" width="18" height="12" rx="2" fill="#3a4a68" stroke="#38d6ff" stroke-width="1.6" />
       <path d="M92 106 V112 M97 106 V112 M102 106 V112" stroke="#38d6ff" stroke-width="2" stroke-linecap="round" />
@@ -422,13 +432,15 @@ defineProps<{ art: string }>()
       <rect x="54" y="82" width="12" height="14" fill="#3a4a68" />
       <path d="M60 20 L60 10" stroke="#8fa8d0" stroke-width="3" stroke-linecap="round" />
       <circle cx="60" cy="9" r="4.5" fill="#e070ff" />
-      <circle cx="60" cy="9" r="8" fill="#e070ff" opacity="0.25" />
+      <circle class="halo" cx="60" cy="9" r="8" fill="#e070ff" opacity="0.25" />
       <rect x="26" y="24" width="68" height="60" rx="18" fill="url(#metalG)" stroke="#8fa8d0" stroke-width="1.6" />
       <rect x="33" y="34" width="54" height="38" rx="12" fill="#0a1020" />
-      <rect x="40" y="46" width="14" height="12" rx="5" fill="url(#screenG)" />
-      <rect x="66" y="46" width="14" height="12" rx="5" fill="url(#screenG)" />
-      <circle cx="44" cy="50" r="2" fill="#fff" opacity="0.9" />
-      <circle cx="70" cy="50" r="2" fill="#fff" opacity="0.9" />
+      <g class="glance">
+        <rect class="eye" x="40" y="46" width="14" height="12" rx="5" fill="url(#screenG)" />
+        <rect class="eye" x="66" y="46" width="14" height="12" rx="5" fill="url(#screenG)" />
+        <circle class="eye" cx="44" cy="50" r="2" fill="#fff" opacity="0.9" />
+        <circle class="eye" cx="70" cy="50" r="2" fill="#fff" opacity="0.9" />
+      </g>
       <path d="M46 65 Q60 71 74 65" fill="none" stroke="#38d6ff" stroke-width="2.6" stroke-linecap="round" />
       <rect x="16" y="44" width="8" height="22" rx="4" fill="#5a6f92" />
       <rect x="96" y="44" width="8" height="22" rx="4" fill="#5a6f92" />
@@ -440,8 +452,8 @@ defineProps<{ art: string }>()
       <rect x="26" y="12" width="68" height="100" rx="6" fill="#1a2438" stroke="#5a7ab0" stroke-width="2" />
       <g v-for="i in 4" :key="i">
         <rect x="32" :y="18 + (i - 1) * 23" width="56" height="19" rx="3" fill="url(#metalG)" stroke="#7d93b8" stroke-width="1" />
-        <circle cx="40" :cy="27.5 + (i - 1) * 23" r="2.6" :fill="i % 2 ? '#2cf5a0' : '#38d6ff'" />
-        <circle cx="48" :cy="27.5 + (i - 1) * 23" r="2.6" :fill="i === 3 ? '#ffb02e' : '#2cf5a0'" />
+        <circle class="led" :style="{ '--i': i }" cx="40" :cy="27.5 + (i - 1) * 23" r="2.6" :fill="i % 2 ? '#2cf5a0' : '#38d6ff'" />
+        <circle class="led slow" :style="{ '--i': i }" cx="48" :cy="27.5 + (i - 1) * 23" r="2.6" :fill="i === 3 ? '#ffb02e' : '#2cf5a0'" />
         <rect x="60" :y="24 + (i - 1) * 23" width="22" height="3" rx="1.5" fill="#0a1020" />
         <rect x="60" :y="29.5 + (i - 1) * 23" width="14" height="3" rx="1.5" fill="#0a1020" />
       </g>
@@ -468,7 +480,7 @@ defineProps<{ art: string }>()
       <circle cx="40" cy="58" r="2.6" fill="#0a3a32" />
       <circle cx="40" cy="84" r="2.6" fill="#0a3a32" />
       <circle cx="40" cy="32" r="2.6" fill="#0a3a32" />
-      <path d="M52 30 l8 -6 l8 6 M60 24 v14" fill="none" stroke="#0a3a32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.5" />
+      <path class="bob" d="M52 30 l8 -6 l8 6 M60 24 v14" fill="none" stroke="#0a3a32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.5" />
     </g>
 
     <!-- 備份 -->
@@ -477,10 +489,12 @@ defineProps<{ art: string }>()
       <rect x="30" y="38" width="60" height="30" rx="4" fill="#0a1020" />
       <circle cx="60" cy="53" r="9" fill="none" stroke="#38d6ff" stroke-width="3" />
       <path d="M60 48 V53 L64 56" fill="none" stroke="#38d6ff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
-      <path d="M60 36 A17 17 0 1 1 43 53" fill="none" stroke="#2cf5a0" stroke-width="3" stroke-linecap="round" />
-      <path d="M38 50 L43 57 L48 50 Z" fill="#2cf5a0" />
+      <g class="sync">
+        <path d="M60 36 A17 17 0 1 1 43 53" fill="none" stroke="#2cf5a0" stroke-width="3" stroke-linecap="round" />
+        <path d="M38 50 L43 57 L48 50 Z" fill="#2cf5a0" />
+      </g>
       <rect x="30" y="74" width="30" height="8" rx="2" fill="#1a2438" />
-      <circle cx="82" cy="78" r="4" fill="#2cf5a0" />
+      <circle class="led slow" cx="82" cy="78" r="4" fill="#2cf5a0" />
       <path d="M36 100 H84 M44 108 H76" stroke="#5a7ab0" stroke-width="3" stroke-linecap="round" opacity="0.5" />
     </g>
   </svg>
@@ -490,5 +504,204 @@ defineProps<{ art: string }>()
 .art {
   width: 100%;
   height: 100%;
+}
+
+/* ───────── 待機小動態：每個節點由外層給不同的 --phase，彼此不會同步 ───────── */
+/* 只設在會動的元素上：帶 transform 屬性的圖形（例如斜貼的 OK 繃）不能被改掉原點 */
+.eye,
+.led,
+.halo,
+.glance,
+.bob,
+.spin,
+.coin,
+.beat,
+.steam,
+.flame {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.eye {
+  animation: blink var(--blink, 5.2s) var(--phase, 0s) infinite;
+}
+@keyframes blink {
+  0%,
+  92%,
+  97%,
+  100% {
+    transform: scaleY(1);
+  }
+  94.5% {
+    transform: scaleY(0.1);
+  }
+}
+.led {
+  animation: led 2.3s calc(var(--phase, 0s) - var(--i, 0) * 0.61s) steps(1) infinite;
+}
+.led.slow {
+  animation-duration: 3.4s;
+}
+@keyframes led {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  71%,
+  80% {
+    opacity: 0.3;
+  }
+}
+.halo {
+  animation: halo 2.6s var(--phase, 0s) ease-in-out infinite;
+}
+@keyframes halo {
+  50% {
+    transform: scale(1.45);
+    opacity: 0.45;
+  }
+}
+.glance {
+  animation: glance 9s var(--phase, 0s) ease-in-out infinite;
+}
+@keyframes glance {
+  0%,
+  40%,
+  100% {
+    transform: translateX(0);
+  }
+  45%,
+  55% {
+    transform: translateX(-3px);
+  }
+  60%,
+  70% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(0);
+  }
+}
+.bob {
+  animation: bob 2.4s var(--phase, 0s) ease-in-out infinite;
+}
+@keyframes bob {
+  50% {
+    transform: translateY(-3px);
+  }
+}
+.sync {
+  transform-box: view-box;
+  transform-origin: 60px 53px;
+  animation: spin 14s linear infinite;
+}
+.spin {
+  animation: spin 9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.swing {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  animation: swing 3.2s var(--phase, 0s) ease-in-out infinite;
+}
+@keyframes swing {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+}
+.coin {
+  animation: coin 6s var(--phase, 0s) ease-in-out infinite;
+}
+@keyframes coin {
+  0%,
+  80%,
+  100% {
+    transform: scaleX(1);
+  }
+  85% {
+    transform: scaleX(0.08);
+  }
+  90% {
+    transform: scaleX(1);
+  }
+}
+.beat {
+  animation: beat 2.8s var(--phase, 0s) ease-in-out infinite;
+}
+@keyframes beat {
+  0%,
+  60%,
+  100% {
+    transform: scale(1);
+  }
+  66% {
+    transform: scale(1.35);
+  }
+  72% {
+    transform: scale(1);
+  }
+  78% {
+    transform: scale(1.2);
+  }
+}
+.steam {
+  animation: steam 2.6s ease-out infinite;
+  opacity: 0;
+}
+.steam.late {
+  animation-delay: -1.3s;
+}
+@keyframes steam {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  30% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.flame {
+  transform-origin: 50% 0;
+  animation: flame 0.35s ease-in-out infinite alternate;
+}
+@keyframes flame {
+  to {
+    transform: scaleY(1.35);
+  }
+}
+.cursor {
+  animation: led 1.1s steps(1) infinite;
+}
+.wifi {
+  animation: wifi 2.4s var(--phase, 0s) ease-in-out infinite;
+}
+.wifi.w2 {
+  animation-delay: calc(var(--phase, 0s) + 0.3s);
+}
+@keyframes wifi {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  40%,
+  70% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .art * {
+    animation: none !important;
+  }
 }
 </style>

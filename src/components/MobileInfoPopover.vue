@@ -5,9 +5,8 @@ import CompanyPanel from './CompanyPanel.vue'
 import ControlledList from './ControlledList.vue'
 import MissionPanel from './MissionPanel.vue'
 import NodeTip from './NodeTip.vue'
-import StageTrack from './StageTrack.vue'
 
-type InfoKind = 'mission' | 'company' | 'track' | 'mine' | 'node' | 'fw'
+type InfoKind = 'mission' | 'company' | 'mine' | 'node' | 'fw'
 interface InfoTarget {
   kind: InfoKind
   nodeId?: string
@@ -30,7 +29,7 @@ let previousFocus: HTMLElement | null = null
 let gesture: Gesture | null = null
 const HOLD_MS = 430
 const MOVE_LIMIT = 12
-const TARGETS = '.mission, .company, .track, .mine, .node, .fw'
+const TARGETS = '.mission, .company, .mine, .node, .fw'
 
 function isCoarse() {
   return typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
@@ -58,7 +57,6 @@ function pickTarget(el: Element): InfoTarget | null {
   if (!hit || !hit.closest('.game') || hit.closest('.mobile-info-popover')) return null
   if (hit.classList.contains('mission')) return { kind: 'mission', title: '本局任務' }
   if (hit.classList.contains('company')) return { kind: 'company', title: '公司狀態與動向' }
-  if (hit.classList.contains('track')) return { kind: 'track', title: '攻擊流程' }
   if (hit.classList.contains('mine')) return { kind: 'mine', title: '我控制的節點' }
   if (hit.classList.contains('node')) {
     const nodeId = (hit as HTMLElement).dataset.nodeId
@@ -200,7 +198,6 @@ onBeforeUnmount(() => {
           <div class="mobile-info-content">
             <MissionPanel v-if="active.kind === 'mission'" detail />
             <CompanyPanel v-else-if="active.kind === 'company'" />
-            <StageTrack v-else-if="active.kind === 'track'" />
             <ControlledList v-else-if="active.kind === 'mine'" />
             <NodeTip v-else-if="active.kind === 'node'" :node-id="active.nodeId" :slot-index="active.slotIndex" />
             <p v-else-if="active.kind === 'fw'" class="gate-copy">{{ active.text }}</p>
@@ -396,14 +393,6 @@ onBeforeUnmount(() => {
 .mobile-info-content .mine .eta {
   font-size: 16px;
 }
-.mobile-info-content .track .tag {
-  font-size: 14px;
-  letter-spacing: 3px;
-  text-indent: 3px;
-}
-.mobile-info-content .track li {
-  font-size: 14px;
-}
 .mobile-info-content .gate-copy {
   margin: 0;
   padding: 14px;
@@ -446,9 +435,7 @@ onBeforeUnmount(() => {
   .game .rail.left .mission {
     padding-bottom: 7px;
   }
-  .game .rail.left .mission .tag,
-  .game .rail.left .track .tag,
-  .game .rail.left .track .lbl {
+  .game .rail.left .mission .tag {
     display: none !important;
   }
   .game .rail.left .mission .head {
@@ -479,21 +466,6 @@ onBeforeUnmount(() => {
   }
   .game .rail.left .mission:hover .pop {
     display: none !important;
-  }
-  .game .rail.left .track {
-    padding-bottom: 5px;
-  }
-  .game .rail.left .track ol {
-    margin: 6px 4px 0;
-    gap: 0;
-  }
-  .game .rail.left .track li {
-    gap: 0;
-    font-size: 0;
-  }
-  .game .rail.left .track .dot {
-    width: 30px;
-    height: 30px;
   }
   .game .rail.left .mine .tag {
     height: 28px;

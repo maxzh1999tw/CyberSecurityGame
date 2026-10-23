@@ -417,19 +417,31 @@ test('通關分析只偵查已開放層，不能預知封鎖內網中的捷徑',
   assert.equal(JSON.stringify(s), before, '分析不得改動實際暗牌')
 })
 
-test('可偵查同層不會繞過指定目標的鎖，恢復外圍入口後才可選 IT', () => {
+test('控制內網後，就算外圍沒有控制，內網與核心也保持開放', () => {
   const s = world()
   control(s, 'infra')
   weakness(s, 'it', 'oversharer')
   node(s, 'it').slots[0]!.vis = 0
   assert.equal(canRecon(s, node(s, 'it')), true)
-  assert.equal(reachKnown(s, node(s, 'it')), 'N')
-  for (const card of ['osint', 'smooth'] as const) {
-    assert.ok(!('it' in playability(s, card).targets))
-    assert.throws(() => play(s, card, 'it'), /尚未解鎖/)
-  }
-  control(s, 'sales')
+  assert.equal(reachKnown(s, node(s, 'it')), 'Y', '已經打進內網，外圍不會把內網鎖回去')
+  assert.equal(reachKnown(s, node(s, 'db')), 'Y')
   for (const card of ['osint', 'smooth'] as const) assert.ok('it' in playability(s, card).targets)
+  // 只控制核心時，內網與核心都開著
+  const deep = world()
+  control(deep, 'db')
+  assert.equal(reachKnown(deep, node(deep, 'it')), 'Y')
+  assert.equal(reachKnown(deep, node(deep, 'backup')), 'Y')
+  assert.equal(canRecon(deep, node(deep, 'it')), true)
+  // 外圍被奪回、內網還在手上：內網照樣可以出牌
+  const lost = world()
+  control(lost, 'sales')
+  control(lost, 'it')
+  lost.nodes.find((n) => n.id === 'sales')!.controlled = false
+  assert.equal(reachKnown(lost, node(lost, 'infra')), 'Y')
+  // 什麼都沒控制時，內網仍鎖著
+  const none = world()
+  assert.equal(reachKnown(none, node(none, 'it')), 'N')
+  assert.equal(canRecon(none, node(none, 'it')), false)
 })
 
 test('開局牌池分析重建初始情報，不受後續封存、揭露或弱點修復影響', () => {
@@ -1224,7 +1236,7 @@ test('連續鞏固會累加完整時長，已控制的深層節點不因原入�
   control(s, 'db')
   const base = recaptureTurnsOf('db')
   assert.equal(reachKnown(s, node(s, 'db')), 'Y')
-  assert.equal(reachKnown(s, node(s, 'backup')), 'N', '不能藉續控放寬其他未控制目標的路徑')
+  assert.equal(reachKnown(s, node(s, 'backup')), 'Y', '已經打進核心，同層的備份也開放')
   for (let repeat = 1; repeat <= 3; repeat++) {
     s.ap = 20
     s.alert = 0
