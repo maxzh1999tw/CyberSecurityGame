@@ -34,6 +34,12 @@ if (process.env.CARD_SCALE) {
   for (const def of Object.values(COMPANY_CARDS)) def.cost = Math.round((def.cost * Number(process.env.CARD_SCALE)) / 5) * 5
 }
 
+// 調單張牌價：CARD_COST=pr=40,monitor=35 node scripts/sim-company.ts 200
+for (const kv of (process.env.CARD_COST ?? '').split(',').filter(Boolean)) {
+  const [id, v] = kv.split('=')
+  COMPANY_CARDS[id as keyof typeof COMPANY_CARDS].cost = Number(v)
+}
+
 // 調產值：VALUE_SHIFT=-4 node scripts/sim-company.ts 200（所有等級的產值範圍一起加減，K）
 if (process.env.VALUE_SHIFT) {
   const d = Number(process.env.VALUE_SHIFT)

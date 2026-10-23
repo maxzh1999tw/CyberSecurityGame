@@ -8,6 +8,8 @@ import { fireNode, hireCandidate, moveNode, openCompany, recommendBuild, setBran
 import { backToMenu, game, toStage, ui } from '../game/store'
 import type { HireKind, Layer } from '../game/types'
 import Icon from './Icon.vue'
+
+const QUICK_BUILD = false
 import NodeArt from './NodeArt.vue'
 
 const d = computed(() => game.draft!)
@@ -284,7 +286,8 @@ const rowProblem = (layer: Layer) => {
             </ul>
             <p v-else-if="errors.length" class="hint"><Icon name="info" :size="16" :stroke="2.4" />把紅色的空位補齊，就能開始營運</p>
             <p v-else class="hint ok"><Icon name="check" :size="16" :stroke="2.8" />配置完成，可以開始營運了</p>
-            <button class="rec" title="用最少的節點排出一個能開業的配置" @click="recommendBuild">
+            <!-- 快速配置暫時隱藏（用它開局賺得太少，太難）；要恢復就把 QUICK_BUILD 改成 true -->
+            <button v-if="QUICK_BUILD" class="rec" title="用最少的節點排出一個能開業的配置" @click="recommendBuild">
               <Icon name="sparkles" :size="22" :stroke="2.4" />快速配置
             </button>
             <button class="go" :disabled="errors.length > 0" @click="openCompany"><Icon name="play" :size="28" :stroke="2.6" />開始營運</button>

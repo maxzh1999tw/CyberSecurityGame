@@ -402,6 +402,7 @@ export function buildCompanyGame(d: DraftState, opts: CompanyGameOptions = {}): 
     debts: [],
     outcome: null,
     hackerAp: COMPANY.hackerAp,
+    perfectStreak: 0,
     drawPerTurn: COMPANY.draw,
     freeSwaps: 0,
   }
@@ -966,7 +967,8 @@ export function endCompanyTurn(s: GameState): CompanyTurnEnd {
   for (const d of co.debts) d.turns -= 1
   co.debts = co.debts.filter((d) => d.turns > 0)
   for (const n of s.nodes) n.training = false
-  if (p.net > 0 && defenseProgress(s).perfect) {
+  co.perfectStreak = p.net > 0 && defenseProgress(s).perfect ? co.perfectStreak + 1 : 0
+  if (co.perfectStreak >= COMPANY.perfectTurns) {
     co.outcome = 'perfect'
     s.phase = 'over'
     s.result = 'lose'

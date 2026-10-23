@@ -395,6 +395,8 @@ export interface CompanyState {
   outcome: 'perfect' | 'caught' | 'blocked' | 'breached' | null
   /** 駭客每回合多拿的行動點 */
   hackerAp: number
+  /** 已經連續幾個公司回合結束時達成完美防禦 */
+  perfectStreak: number
   /** 每回合抽幾張：開業時就固定，員工之後被癱瘓、控制、隔離都不會改變 */
   drawPerTurn: number
   /** 這回合還剩幾次免費換牌（手牌滿了抽不到牌時給的補償） */
