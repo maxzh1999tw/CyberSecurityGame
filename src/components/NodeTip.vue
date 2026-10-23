@@ -248,21 +248,24 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
       </div>
     </template>
     <div v-else-if="slotTip" class="vr" :class="slotTip.kind">
-      <Icon :name="slotTip.icon" :size="24" :stroke="2.3" />
-      <div class="vt">
+      <!-- 第一行：圖示、名稱、狀態標籤；下面的說明用整個寬度 -->
+      <div class="vh">
+        <Icon :name="slotTip.icon" :size="24" :stroke="2.3" />
         <b>{{ slotTip.name }}</b>
+        <span v-if="slotTip.eye" class="vis" :class="slotTip.eye">
+          <Icon name="eye" :size="16" :stroke="2.4" />{{ slotTip.status }}
+        </span>
+        <span v-else-if="slotTip.status === '已揭露'" class="vis pub" title="公司看得到，會開始修復倒數">
+          <Icon name="eye" :size="16" :stroke="2.4" />{{ slotTip.status }}
+        </span>
+        <span v-else class="vis" :class="slotTip.kind === 'fixed' ? 'fixed-status' : 'protected-status'">{{ slotTip.status }}</span>
+      </div>
+      <div class="vt">
         <span>{{ slotTip.text }}</span>
         <em v-if="slotTip.rule">規則：{{ slotTip.rule }}</em>
         <small v-if="slotTip.who" class="who" :class="slotTip.eye">{{ slotTip.who }}</small>
         <small v-if="slotTip.repair">{{ slotTip.repair }}</small>
       </div>
-      <span v-if="slotTip.eye" class="vis" :class="slotTip.eye">
-        <Icon name="eye" :size="16" :stroke="2.4" />{{ slotTip.status }}
-      </span>
-      <span v-else-if="slotTip.status === '已揭露'" class="vis pub" title="公司看得到，會開始修復倒數">
-        <Icon name="eye" :size="16" :stroke="2.4" />{{ slotTip.status }}
-      </span>
-      <span v-else class="vis" :class="slotTip.kind === 'fixed' ? 'fixed-status' : 'protected-status'">{{ slotTip.status }}</span>
     </div>
   </div>
 </template>
@@ -386,8 +389,8 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
 }
 .vr {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
   padding: 10px 12px;
   border-radius: 9px;
   color: var(--ink);
@@ -412,13 +415,19 @@ const visible = computed(() => !!node.value && !ui.drag && (tipKind.value === 'n
 .vr.struck b {
   text-decoration: line-through;
 }
-.vt {
+.vh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vh b {
   flex: 1;
+  min-width: 0;
+  font-size: 20px;
+}
+.vt {
   display: flex;
   flex-direction: column;
-}
-.vt b {
-  font-size: 20px;
 }
 .vt span {
   font-size: 19px;
