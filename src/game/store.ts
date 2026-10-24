@@ -380,9 +380,10 @@ export function confirmIntro() {
   })()
 }
 
-/** 第一次導覽看過了沒（駭客模式、公司模式分開記） */
-export const coachKey = (mode: 'hacker' | 'company') => (mode === 'company' ? 'csg-coach-company' : 'csg-coach')
-export function coachSeen(mode: 'hacker' | 'company'): boolean {
+/** 第一次導覽看過了沒（駭客模式、公司模式、組建公司分開記） */
+export type CoachMode = 'hacker' | 'company' | 'recruit'
+export const coachKey = (mode: CoachMode) => (mode === 'hacker' ? 'csg-coach' : `csg-coach-${mode}`)
+export function coachSeen(mode: CoachMode): boolean {
   try {
     return localStorage.getItem(coachKey(mode)) === '1'
   } catch {

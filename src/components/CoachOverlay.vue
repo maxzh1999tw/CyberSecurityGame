@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// 第一次遊玩時的導覽：直接指著畫面上的東西（駭客模式、公司模式各一套）
+// 第一次遊玩時的導覽：直接指著畫面上的東西（駭客模式、公司模式、組建公司各一套）
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { COMPANY, TIER_VULNS } from '../game/companyData'
 import { anchorRect, boardCenter, coachKey, game, nodeRect, ui, view } from '../game/store'
-import type { Rect } from '../game/store'
+import type { CoachMode, Rect } from '../game/store'
 import Icon from './Icon.vue'
 
 interface Step {
@@ -75,8 +76,43 @@ const COMPANY_STEPS: Step[] = [
   },
 ]
 
-const company = computed(() => game.s?.mode === 'company')
-const STEPS = computed(() => (company.value ? COMPANY_STEPS : HACKER_STEPS))
+const RECRUIT_STEPS: Step[] = [
+  {
+    target: () => anchorRect('market'),
+    text: '這裡是人力市場。點一下就能聘用，也可以拖到左邊公司的某一層。',
+    side: 'left',
+  },
+  {
+    target: () => anchorRect('marketTabs'),
+    text: '分頁是不同種類的人才與設備。分頁上有紅點，代表公司還缺這一類。',
+    side: 'below',
+  },
+  {
+    target: () => anchorRect('firstCand'),
+    text: `星級越高，底下的弱點越少（一星 ${TIER_VULNS[1]} 個、二星 ${TIER_VULNS[2]} 個、三星 ${TIER_VULNS[3]} 個），但薪水也越高，淨賺越少。`,
+    side: 'left',
+  },
+  {
+    target: () => anchorRect('layers'),
+    text: `公司分成外圍、內網、核心三層，每層最多 ${COMPANY.layerMax} 個。紅色的空位是還缺的節點，點一下就跳到那一類。`,
+    side: 'right',
+  },
+  {
+    target: () => anchorRect('ledger'),
+    text: `這裡預估每回合的收益。有產值的節點要靠基礎設施支援，收益要到 +${COMPANY.minNet}K 才能開業。`,
+    side: 'above',
+  },
+  {
+    target: () => anchorRect('open'),
+    text: '空位都補齊、收益也達標，就按這裡開始營運。',
+    side: 'above',
+  },
+]
+
+const mode = computed<CoachMode>(() => (game.screen === 'draft' ? 'recruit' : game.s?.mode === 'company' ? 'company' : 'hacker'))
+// 公司模式與組建公司都是亮色的辦公室畫面
+const company = computed(() => mode.value !== 'hacker')
+const STEPS = computed(() => ({ hacker: HACKER_STEPS, company: COMPANY_STEPS, recruit: RECRUIT_STEPS })[mode.value])
 const step = computed(() => (ui.coach === null ? null : STEPS.value[ui.coach]))
 const rect = computed(() => step.value?.target() ?? null)
 
@@ -133,7 +169,7 @@ function next() {
 function finish() {
   ui.coach = null
   try {
-    localStorage.setItem(coachKey(company.value ? 'company' : 'hacker'), '1')
+    localStorage.setItem(coachKey(mode.value), '1')
   } catch {
     /* 沒有儲存空間也沒關係 */
   }

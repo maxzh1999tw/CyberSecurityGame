@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // 公司模式：組建公司。左邊是你的公司（三層），右邊是人力市場（分類分頁）；
 // 從右邊拖到左邊的某一層就聘用，點一下會放到第一個放得下的層。
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { forecast, layerCount, LAYER_NAMES, openErrors, placeProblem, seatsOf, type Candidate } from '../game/company'
 import { BRAND_COLORS, BRAND_LOGOS, BRAND_NAME_MAX, COMPANY, HIRES, INFRA_SEATS, MARKET_ORDER, REQUIRED, TIER_NAME, TIER_VULNS } from '../game/companyData'
 import { fireNode, hireCandidate, moveNode, openCompany, recommendBuild, setBrand } from '../game/companyStore'
-import { backToMenu, game, toStage, ui } from '../game/store'
+import { backToMenu, coachSeen, game, registerAnchor, toStage, ui } from '../game/store'
 import type { HireKind, Layer } from '../game/types'
+import CoachOverlay from './CoachOverlay.vue'
 import Icon from './Icon.vue'
 
 const QUICK_BUILD = false
@@ -133,6 +134,13 @@ function cancel() {
 }
 onBeforeUnmount(stop)
 
+// 第一次進來：一步一步指著畫面介紹怎麼組公司（等錨點都掛好再開始）
+onMounted(() => {
+  if (!coachSeen('recruit')) void nextTick(() => (ui.coach = 0))
+})
+onBeforeUnmount(() => (ui.coach = null))
+const anchor = (name: string) => (el: unknown) => registerAnchor(name, el as HTMLElement | null)
+
 /** 拖曳中：這一層能不能放 */
 const rowState = (layer: Layer) => {
   const g = drag.value
@@ -219,7 +227,7 @@ const rowProblem = (layer: Layer) => {
           <span class="ptitle"><Icon name="building-2" :size="24" :stroke="2.2" />你的公司</span>
           <span class="pcount">{{ d.picks.length }} 個節點</span>
         </div>
-        <div class="layers">
+        <div :ref="anchor('layers')" class="layers">
           <div v-for="row in ROWS" :key="row.layer" class="lrow" :class="['layer-' + row.layer, rowState(row.layer)]" :data-zone="row.layer">
             <div class="lname">
               <span class="lic"><Icon :name="row.icon" :size="22" :stroke="2.2" /></span>
@@ -263,7 +271,7 @@ const rowProblem = (layer: Layer) => {
         </div>
 
         <div class="summary">
-          <div class="ledger">
+          <div :ref="anchor('ledger')" class="ledger">
             <div class="lhead"><Icon name="receipt-text" :size="18" :stroke="2.4" />每回合損益（預估）</div>
             <div class="line"><span>產值</span><b class="g">+{{ fc.gross }}K</b></div>
             <div class="line sub" :class="{ full: seatsUsed >= seats }" title="基礎設施依等級能支援 3～6 個有產值的節點；滿了要先多聘或換一台更好的基礎設施">
@@ -290,18 +298,18 @@ const rowProblem = (layer: Layer) => {
             <button v-if="QUICK_BUILD" class="rec" title="用最少的節點排出一個能開業的配置" @click="recommendBuild">
               <Icon name="sparkles" :size="22" :stroke="2.4" />快速配置
             </button>
-            <button class="go" :disabled="errors.length > 0" @click="openCompany"><Icon name="play" :size="28" :stroke="2.6" />開始營運</button>
+            <button :ref="anchor('open')" class="go" :disabled="errors.length > 0" @click="openCompany"><Icon name="play" :size="28" :stroke="2.6" />開始營運</button>
           </div>
         </div>
       </section>
 
       <!-- 右：人力市場 -->
-      <section class="market" data-zone="market" :class="{ drop: drag?.moved && drag.from === 'company', over: drag?.over === 'market' }">
+      <section :ref="anchor('market')" class="market" data-zone="market" :class="{ drop: drag?.moved && drag.from === 'company', over: drag?.over === 'market' }">
         <div class="phead">
           <span class="ptitle"><Icon name="briefcase-business" :size="24" :stroke="2.2" />人力市場</span>
           <span class="pcount">點一下直接聘用，或拖到指定的層</span>
         </div>
-        <div class="tabs">
+        <div :ref="anchor('marketTabs')" class="tabs">
           <button
             v-for="h in MARKET_ORDER"
             :key="h"
@@ -322,8 +330,9 @@ const rowProblem = (layer: Layer) => {
         </p>
         <div class="grid">
           <div
-            v-for="c in d.market[tab]"
+            v-for="(c, i) in d.market[tab]"
             :key="c.uid"
+            :ref="i === 0 ? anchor('firstCand') : undefined"
             class="cand"
             :class="['h-' + c.hire, 'tier-' + c.tier, { lifted: drag?.moved && drag.uid === c.uid }]"
             @pointerdown.prevent="down(c, 'market', $event)"
@@ -365,6 +374,8 @@ const rowProblem = (layer: Layer) => {
         <Icon :name="ui.toast.tone === 'info' ? 'sparkles' : 'circle-alert'" :size="20" :stroke="2.4" />{{ ui.toast.text }}
       </div>
     </Transition>
+
+    <CoachOverlay />
 
     <!-- 拖曳中的節點 -->
     <div v-if="drag?.moved" class="ghost" :class="'h-' + drag.c.hire" :style="{ left: drag.x + 'px', top: drag.y + 'px' }">
