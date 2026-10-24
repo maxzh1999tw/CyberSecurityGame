@@ -147,6 +147,21 @@ test('經濟：被控制的節點照樣有產值；癱瘓、隔離、受訓的�
   assert.ok(productionOf(s).gross < base.gross)
 })
 
+test('第 2 台起的基礎設施每台每回合多付加價：組建試算與遊戲中的營收一致', () => {
+  const d = drafted()
+  const infras = d.picks.filter((p) => p.hire === 'infra').length
+  const f = forecast(d.picks, d.placement)
+  assert.equal(f.surcharge, Math.max(0, infras - 1) * COMPANY.extraInfraCost)
+  assert.equal(f.upkeep, d.picks.reduce((a, p) => a + p.cost, 0) + f.surcharge)
+  const s = buildCompanyGame(d, { seed: 7 })
+  assert.equal(productionOf(s).surcharge, f.surcharge)
+  assert.equal(productionOf(s).net, f.net, '還沒開局，全部節點都在運作')
+  // 只剩一台就沒有加價
+  const one = s.nodes.filter((n) => n.econ?.hire === 'infra')
+  for (const n of one.slice(1)) n.econ!.hire = 'ai'
+  assert.equal(productionOf(s).surcharge, 0)
+})
+
 test('經濟：基礎設施被癱瘓不影響其他節點的產值；主管帶同層員工', () => {
   const s = companyTurn(11)
   const before = productionOf(s)

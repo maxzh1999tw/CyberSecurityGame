@@ -157,6 +157,16 @@ const rowProblem = (layer: Layer) => {
   const g = drag.value
   return g?.moved && g.over === layer ? placeProblem(d.value, g.c, layer) : null
 }
+
+// 第 2 台起的基礎設施每回合要多付錢：市場卡片、拖曳中、放下去的那一層都說清楚
+const infraCount = computed(() => tabCount('infra'))
+/** 正從市場拖進第幾台基礎設施（第 2 台起才有加價；0 代表沒有） */
+const extraInfra = computed(() => {
+  const g = drag.value
+  return g?.moved && g.from === 'market' && g.c.hire === 'infra' && infraCount.value >= 1 ? infraCount.value + 1 : 0
+})
+const rowInfo = (layer: Layer) =>
+  extraInfra.value && drag.value?.over === layer ? `第 ${extraInfra.value} 台基礎設施：每回合維護費多 ${COMPANY.extraInfraCost}K` : null
 </script>
 
 <template>
@@ -272,6 +282,7 @@ const rowProblem = (layer: Layer) => {
               <span v-if="!inLayer(row.layer).length && !placeholders(row.layer).length" class="empty">{{ row.hint }}</span>
             </div>
             <div v-if="rowProblem(row.layer)" class="rowwarn"><Icon name="circle-alert" :size="18" :stroke="2.4" />{{ rowProblem(row.layer) }}</div>
+            <div v-else-if="rowInfo(row.layer)" class="rowwarn info"><Icon name="coins" :size="18" :stroke="2.4" />{{ rowInfo(row.layer) }}</div>
           </div>
         </div>
 
@@ -284,6 +295,7 @@ const rowProblem = (layer: Layer) => {
             </div>
             <div v-if="fc.lead" class="line sub"><span>主管帶人加成</span><b class="g">+{{ fc.lead }}K</b></div>
             <div class="line"><span>薪水與維護費</span><b class="r">−{{ fc.upkeep }}K</b></div>
+            <div v-if="fc.surcharge" class="line sub"><span>其中第 2 台起的基礎設施加價</span><b class="r">−{{ fc.surcharge }}K</b></div>
             <div class="line tot" :class="{ ok: netOk }">
               <span>每回合收益</span>
               <b>{{ fc.net >= 0 ? '+' : '' }}{{ fc.net }}<small>K</small></b>
@@ -356,6 +368,9 @@ const rowProblem = (layer: Layer) => {
               <div class="info">
                 <b>{{ c.name }}</b>
                 <div v-if="c.hire === 'infra'" class="seat"><Icon name="users" :size="15" :stroke="2.4" />能支援 {{ INFRA_SEATS[c.tier] }} 個有產值的節點</div>
+                <div v-if="c.hire === 'infra' && infraCount >= 1" class="seat extra">
+                  <Icon name="coins" :size="15" :stroke="2.4" />再聘就是第 {{ infraCount + 1 }} 台：每回合多 {{ COMPANY.extraInfraCost }}K
+                </div>
                 <div v-if="c.value" class="stat v">
                   <span>產值</span><i><u :style="{ width: bar(c.value, 50) }"></u></i><em>+{{ c.value }}K</em>
                 </div>
@@ -388,6 +403,7 @@ const rowProblem = (layer: Layer) => {
       <span>
         <b>{{ drag.c.name }}</b>
         <small>{{ HIRES[drag.c.hire].label }}・{{ tierName(drag.c) }}</small>
+        <em v-if="extraInfra" class="extra">第 {{ extraInfra }} 台：每回合多 {{ COMPANY.extraInfraCost }}K</em>
       </span>
     </div>
   </div>
@@ -1026,6 +1042,11 @@ em {
 .ph:hover {
   background: rgba(212, 80, 63, 0.14);
 }
+.rowwarn.info {
+  color: #6b4a0e;
+  background: #f6d98a;
+  box-shadow: 0 4px 10px rgba(150, 110, 20, 0.25);
+}
 .rowwarn {
   position: absolute;
   right: 10px;
@@ -1477,6 +1498,10 @@ em {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.seat.extra {
+  color: #7a4f00;
+  background: #fbe7b5;
+}
 .seat {
   display: inline-flex;
   align-self: flex-start;
@@ -1604,6 +1629,13 @@ em {
   font-size: 15px;
   font-weight: 800;
   color: color-mix(in srgb, var(--hc) 85%, #000);
+}
+.ghost .extra {
+  margin-top: 2px;
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 900;
+  color: #8a5a00;
 }
 
 /* ───── 提示 ───── */

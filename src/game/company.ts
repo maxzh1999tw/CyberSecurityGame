@@ -172,6 +172,9 @@ const countOf = (picks: Candidate[], hire: HireKind) => picks.filter((p) => p.hi
 export const seatsOf = (picks: Array<{ hire: HireKind; tier: Tier }>) =>
   picks.filter((p) => p.hire === 'infra').reduce((a, p) => a + INFRA_SEATS[p.tier], 0)
 
+/** 多台基礎設施的加價：第 2 台起每台每回合多付 extraInfraCost */
+export const infraSurcharge = (infraCount: number) => Math.max(0, infraCount - 1) * COMPANY.extraInfraCost
+
 /** 有產值的節點有幾個 */
 export const productiveCount = (picks: Candidate[]) => picks.filter((p) => HIRES[p.hire].productive).length
 /**
@@ -333,8 +336,9 @@ export function forecast(picks: Candidate[], placement: Placement) {
     lead += Math.min(COMPANY.leadMax, staff) * COMPANY.leadValue
   }
   const gross = productive.reduce((a, p) => a + p.value, 0) + lead
-  const upkeep = picks.reduce((a, p) => a + p.cost, 0)
-  return { gross, lead, upkeep, net: gross - upkeep }
+  const surcharge = infraSurcharge(countOf(picks, 'infra'))
+  const upkeep = picks.reduce((a, p) => a + p.cost, 0) + surcharge
+  return { gross, lead, upkeep, surcharge, net: gross - upkeep }
 }
 
 // ───────────────────────── 開局 ─────────────────────────
@@ -463,8 +467,10 @@ export interface Production {
   gross: number
   /** 主管帶來的加成 */
   lead: number
-  /** 薪水與維護費 */
+  /** 薪水與維護費（含多台基礎設施的加價） */
   upkeep: number
+  /** 其中第 2 台起基礎設施的加價 */
+  surcharge: number
   /** 拉攏投資的還款 */
   debt: number
   /** 每回合營收：下個公司回合開始時，照當時有在運作的節點入帳 */
@@ -482,12 +488,14 @@ export function productionOf(s: GameState): Production {
     lead += Math.min(COMPANY.leadMax, staff) * COMPANY.leadValue
   }
   const gross = productive.reduce((a, n) => a + n.econ!.value, 0) + lead
-  const upkeep = s.nodes.reduce((a, n) => a + (n.econ?.cost ?? 0), 0)
+  const surcharge = infraSurcharge(s.nodes.filter((n) => hireOf(n) === 'infra').length)
+  const upkeep = s.nodes.reduce((a, n) => a + (n.econ?.cost ?? 0), 0) + surcharge
   const debt = co.debts.reduce((a, x) => a + x.amount, 0)
   return {
     gross,
     lead,
     upkeep,
+    surcharge,
     debt,
     net: gross - upkeep - debt,
   }

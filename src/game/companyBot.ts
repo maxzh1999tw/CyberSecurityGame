@@ -92,7 +92,7 @@ export function leanBuild(d: DraftState) {
   noLowest = true
   leanTry(d)
   // 不用一星排不到門檻：人力市場多刷幾位二星、三星的人選再排
-  for (let round = 0; round < 5 && openErrors(d).length; round++) {
+  for (let round = 0; round < 10 && openErrors(d).length; round++) {
     for (const p of [...d.picks]) fire(d, p.uid)
     addMarketCandidates(d, ['staff', 'exec', 'ai', 'infra'])
     leanTry(d)
