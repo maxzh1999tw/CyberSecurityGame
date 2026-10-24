@@ -204,9 +204,13 @@ export function botCompanyTurn(s: GameState, play: (uid: number, target?: string
       }
     }
     if (!options.length) {
-      // 有節點被控制卻沒有應變牌：花錢換牌找奪回控制
+      // 沒有值得打的牌：花錢換牌，找奪回控制或稽核（不換的話，手牌會被不想打的牌塞滿、抽不到新牌）
       const urgent = s.nodes.some((n) => n.controlled)
-      const junk = co.hand.find((c) => !canPlayCompany(s, c.id) || c.id === 'isolate' || c.id === 'replace' || c.id === 'upgrade')
+      // 先換打不出去的，再換很少用的，最後才換能打但現在不划算的
+      const junk =
+        co.hand.find((c) => !canPlayCompany(s, c.id)) ??
+        co.hand.find((c) => c.id === 'isolate' || c.id === 'replace' || c.id === 'upgrade') ??
+        co.hand[0]
       if (junk && (co.freeSwaps > 0 || co.assets - COMPANY.recycleCost >= (urgent ? 20 : 60))) {
         recycleCompanyCard(s, junk.uid)
         continue
