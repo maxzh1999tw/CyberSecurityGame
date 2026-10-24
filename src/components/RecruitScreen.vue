@@ -29,16 +29,19 @@ const otherErrors = computed(() => errors.value.filter((e) => e.includes('每回
 const placeholders = (layer: Layer) => {
   const cnt = (h: HireKind, at?: Layer) =>
     d.value.picks.filter((p) => p.hire === h && (at === undefined || d.value.placement[p.uid] === at)).length
-  const out: Array<{ h: HireKind; key: string; flex: boolean }> = []
+  const out: Array<{ h: HireKind; key: string; note: string | null }> = []
+  // 一定要在這一層的（flex 是哪一層都算數的）：別層已經有同類的，提示可以直接移過來
   const add = (h: HireKind, n: number, flex = false) => {
-    for (let k = 0; k < n; k++) out.push({ h, key: `${h}${k}`, flex })
+    const elsewhere = !flex && cnt(h) > cnt(h, layer)
+    const note = flex ? anyLayer(h) : elsewhere ? '可把別層的移過來' : null
+    for (let k = 0; k < n; k++) out.push({ h, key: `${h}${k}`, note })
   }
   if (layer === 2) {
-    add('db', REQUIRED.db - cnt('db'))
-    add('backup', REQUIRED.backup - cnt('backup'))
+    add('db', REQUIRED.db - cnt('db', 2))
+    add('backup', REQUIRED.backup - cnt('backup', 2))
   } else if (layer === 1) {
-    add('it', REQUIRED.it - cnt('it'))
-    add('infra', REQUIRED.infra - cnt('infra'))
+    add('it', REQUIRED.it - cnt('it', 1))
+    add('infra', REQUIRED.infra - cnt('infra', 1))
   } else {
     add('staff', COMPANY.minOuterStaff - cnt('staff', 0))
     add('exec', REQUIRED.exec - cnt('exec'), true)
@@ -46,6 +49,8 @@ const placeholders = (layer: Layer) => {
   }
   return out
 }
+const anyLayer = (h: HireKind) =>
+  HIRES[h].layers.length === 3 ? '哪一層都可以' : `${HIRES[h].layers.map((l) => LAYER_NAMES[l]).join('或')}都可以`
 const netOk = computed(() => fc.value.net >= COMPANY.minNet)
 // 基礎設施的位置：每台能支援幾個有產值的節點（硬上限）
 const seats = computed(() => seatsOf(d.value.picks))
@@ -54,8 +59,8 @@ const seatsUsed = computed(() => d.value.picks.filter((p) => HIRES[p.hire].produ
 const GOAL_AT = 40
 const netPct = computed(() => Math.max(0, Math.min(100, (fc.value.net / COMPANY.minNet) * GOAL_AT)))
 const ROWS: Array<{ layer: Layer; icon: string; hint: string }> = [
-  { layer: 2, icon: 'database', hint: '資料庫、備份，也可以放基礎設施' },
-  { layer: 1, icon: 'network', hint: 'IT、基礎設施，也可以放主管、AI' },
+  { layer: 2, icon: 'database', hint: '資料庫、備份，也可以放基礎設施、AI' },
+  { layer: 1, icon: 'network', hint: 'IT、基礎設施，也可以放員工、主管、AI' },
   { layer: 0, icon: 'globe', hint: '一般員工，也可以放主管、AI' },
 ]
 const inLayer = (layer: Layer) => d.value.picks.filter((p) => d.value.placement[p.uid] === layer)
@@ -261,7 +266,7 @@ const rowProblem = (layer: Layer) => {
                 </div>
                 <button v-for="ph in placeholders(row.layer)" :key="'ph' + ph.key" class="ph" :title="`從人力市場的「${HIRES[ph.h].label}」分頁拖進來`" @click="tab = ph.h">
                   <span class="phic"><Icon :name="HIRES[ph.h].icon" :size="22" :stroke="2.2" /></span>
-                  <span><b>還缺{{ HIRES[ph.h].label }}</b><small v-if="ph.flex">外圍或內網都可以</small></span>
+                  <span><b>還缺{{ HIRES[ph.h].label }}</b><small v-if="ph.note">{{ ph.note }}</small></span>
                 </button>
               </TransitionGroup>
               <span v-if="!inLayer(row.layer).length && !placeholders(row.layer).length" class="empty">{{ row.hint }}</span>
