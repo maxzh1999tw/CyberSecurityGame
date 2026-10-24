@@ -554,11 +554,10 @@ export interface Playability {
   autoTri: Tri
 }
 
-/** 套用主管、董事長的權限核准折扣後、尚未套用 AI 免費出牌前的費用。 */
+/** 套用董事長的權限核准折扣後、尚未套用 AI 免費出牌前的費用。 */
 function beforeFree(s: GameState, id: CardId): number {
   const def = CARDS[id]
   let cost = def.cost
-  if (cost > 0 && def.stage === '擴散' && roleCtrl(s, 'boss')) cost = Math.max(1, cost - 1)
   if (cost > 0 && def.stage === '得手' && roleCtrl(s, 'chairman')) cost = Math.max(1, cost - 1)
   return cost
 }
@@ -1068,8 +1067,10 @@ export function noLogs(s: GameState, H: Has = trueHas): Tri {
   return or(...infras(s).map((i) => H(i, 'nolog')))
 }
 
-export function noiseOf(s: GameState, base: number): number {
-  return noLogs(s) === 'Y' ? Math.ceil(base / 2) : base
+/** 實際噪音：沒人看紀錄減半；控制主管（他幫忙掩護）每張牌再 −1，最低 0 */
+export function noiseOf(s: GameState, base: number, H: Has = trueHas): number {
+  const n = noLogs(s, H) === 'Y' ? Math.ceil(base / 2) : base
+  return n > 0 && roleCtrl(s, 'boss') ? n - 1 : n
 }
 
 function isFinisherOfMission(s: GameState, id: CardId): boolean {
@@ -1163,7 +1164,8 @@ export function startHackerTurn(s: GameState): CardInst[] {
 
 export type BlockReason = 'itControlled' | 'itParalyzed' | 'infraParalyzed' | null
 
-const infraDown = (s: GameState) => infras(s).some((n) => n.paralyzed > 0)
+/** 所有基礎設施都中斷時，公司的修復與奪回才會停住（多買幾台，駭客就得全部打掉） */
+const infraDown = (s: GameState) => infras(s).length > 0 && infras(s).every((n) => n.paralyzed > 0)
 
 /** 所有 IT 都被癱瘓時，公司的應變才會全部停住 */
 const allItParalyzed = (s: GameState) => its(s).every((n) => n.paralyzed > 0 || !!n.isolated)

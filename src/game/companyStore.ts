@@ -232,8 +232,18 @@ async function hackerBotTurn() {
     return
   }
   const drew = startCompanyTurn(s)
+  // 營收入帳：在公司資產上飄出這回合入帳多少
+  const income = s.company!.income
+  const money = anchorRect('money')
+  float(money?.cx ?? boardCenter(), money?.cy ?? 200, `${income >= 0 ? '+' : ''}${income}K 入帳`, income >= 0 ? 'gold' : 'bad', 'coins')
+  await wait(500)
   if (checkBlocked(s)) {
     await presentBlocked()
+    await finishGame()
+    return
+  }
+  if (s.company!.outcome === 'bankrupt') {
+    await presentBankrupt()
     await finishGame()
     return
   }
@@ -334,8 +344,18 @@ async function playCompany(uid: number, target?: string, from?: CastSpec['from']
   if (over(s)) {
     if (s.company?.outcome === 'blocked') await presentBlocked()
     if (s.company?.outcome === 'caught') await presentCaught()
+    if (s.company?.outcome === 'bankrupt') await presentBankrupt()
     await finishGame()
   }
+}
+
+/** 破產：在公司資產上蓋章 */
+async function presentBankrupt() {
+  ui.busy = true
+  sfx.fail()
+  const at = anchorRect('money')
+  plaque(at ? at.x + at.w + 200 : boardCenter(), at?.cy ?? 200, { title: '破產!', sub: '資產變成負的，手上也沒有能賺錢的牌了', tone: 'bad', icon: 'trending-down', style: 'stamp' }, 2600)
+  await wait(2000)
 }
 
 /** 公司自己把警戒推到 10：在警戒條上蓋章 */
@@ -392,7 +412,7 @@ async function presentCompanyEffect(eff: CompanyEffect, name: string) {
   }).length
   const sub =
     eff.revealed.length ? (found ? `發現 ${found} 個弱點` : '沒有發現弱點')
-    : eff.fixed.length ? '弱點補好了'
+    : eff.fixed.length ? eff.message || '弱點補好了'
     : eff.recaptured.length ? '奪回控制'
     : eff.renewed.length ? '換新了'
     : eff.message || undefined
@@ -408,11 +428,10 @@ export function companyEndTurn() {
   void runSafely(async () => {
     ui.busy = true
     sfx.endTurn()
-    const end = endCompanyTurn(s)
-    const ar = nodeRect(s.nodes[0].id)
-    float(boardCenter(), (ar?.y ?? 300) - 30, `${end.net >= 0 ? '+' : ''}${end.net}K`, end.net >= 0 ? 'gold' : 'bad', 'coins')
-    await wait(700)
+    endCompanyTurn(s)
+    await wait(400)
     if (over(s)) {
+      if (s.company?.outcome === 'bankrupt') await presentBankrupt()
       await finishGame()
       return
     }

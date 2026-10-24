@@ -73,7 +73,7 @@ const pos = computed(() => {
 const ABILITY: Record<string, { icon: string; text: string }> = {
   sales: { icon: 'zap', text: '每回合 +1 行動點' },
   engineer: { icon: 'zap', text: '每回合 +1 行動點' },
-  boss: { icon: 'crown', text: '擴散牌費用 −1（最低 1）；可冒充老闆要求轉帳' },
+  boss: { icon: 'crown', text: '每張牌噪音 −1（最低 0）；可冒充老闆要求轉帳' },
   chairman: { icon: 'hand-coins', text: '得手牌費用 −1（最低 1）；可冒充老闆要求轉帳' },
   it: { icon: 'wrench', text: '公司的「修補」全部失效' },
   infra: { icon: 'bug', text: '再控制員工即可對它植入賽博病毒，每回合偷看 1 張' },

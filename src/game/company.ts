@@ -395,8 +395,7 @@ export function buildCompanyGame(d: DraftState, opts: CompanyGameOptions = {}): 
   s.company = {
     brand: { ...d.brand, name: d.brand.name.trim() || DEFAULT_BRAND.name },
     assets: d.assets,
-    spent: 0,
-    bonus: 0,
+    income: 0,
     hand: [],
     deck: [],
     discard: [],
@@ -410,6 +409,7 @@ export function buildCompanyGame(d: DraftState, opts: CompanyGameOptions = {}): 
     perfectStreak: 0,
     drawPerTurn: COMPANY.draw,
     freeSwaps: 0,
+    trainingNext: false,
   }
   // 每回合抽幾張：開業時就固定，之後員工被控制、隔離、癱瘓都不會改變
   s.company.drawPerTurn = COMPANY.draw + Math.floor(staffCount(s) / COMPANY.staffPerDraw)
@@ -467,9 +467,7 @@ export interface Production {
   upkeep: number
   /** 拉攏投資的還款 */
   debt: number
-  spent: number
-  bonus: number
-  /** 本回合營收（回合結束時加進資產） */
+  /** 每回合營收：下個公司回合開始時，照當時有在運作的節點入帳 */
   net: number
 }
 
@@ -491,9 +489,7 @@ export function productionOf(s: GameState): Production {
     lead,
     upkeep,
     debt,
-    spent: co.spent,
-    bonus: co.bonus,
-    net: gross - upkeep - debt - co.spent + co.bonus,
+    net: gross - upkeep - debt,
   }
 }
 
@@ -513,8 +509,8 @@ export function companyTargets(s: GameState, id: CompanyCardId): string[] {
     case 'pentest':
       return ok((n) => unknownSlots(n).length > 0)
     case 'patch':
-      return ok((n) => isMachine(n) && knownVulns(n).length > 0)
-    case 'training':
+      return ok((n) => (isMachine(n) || n.kind === 'ai') && knownVulns(n).length > 0)
+    case 'reminder':
       return ok((n) => isPerson(n) && !n.training && knownVulns(n).length > 0)
     case 'upgrade':
       return ok((n) => (isMachine(n) || n.kind === 'ai') && (n.econ?.tier ?? 3) < 3)
@@ -533,9 +529,11 @@ export function companyTargets(s: GameState, id: CompanyCardId): string[] {
     case 'restoreDrill':
       return ok((n) => n.role === 'backup' && (n.paralyzed > 0 || unknownSlots(n).length > 0))
     default: {
-      // 猜弱點的修補牌：可能有這個弱點的節點都能指定
+      // 猜弱點的修補牌：可能有這個弱點的節點都能指定；教育訓練中，同一層有員工可能有就能指定
       const v = FIX_VULN[id]
-      return v ? ok((n) => fixGuess(n, v) !== 'N') : []
+      if (!v) return []
+      const group = trainingBoosts(s, id)
+      return ok((n) => fixGuess(n, v) !== 'N' || (group && s.nodes.some((p) => p.layer === n.layer && isPerson(p) && fixGuess(p, v) !== 'N')))
     }
   }
 }
@@ -545,9 +543,9 @@ export function canPlayCompany(s: GameState, id: CompanyCardId): boolean {
   return s.phase === 'company' && companyCardUsable(s, id)
 }
 
-/** 再花 cost 的話，回合結束時資產會跌破 0：錢不夠，不能打這張牌、不能付費換牌 */
+/** 資產付不起 cost：不能打這張牌、不能付費換牌 */
 export function overBudget(s: GameState, cost: number): boolean {
-  return cost > 0 && s.company!.assets + productionOf(s).net - cost < 0
+  return cost > 0 && s.company!.assets - cost < 0
 }
 
 /** 這張牌在目前的局面有沒有用處（不管現在輪到誰；駭客回合時手牌也照這個顯示） */
@@ -558,8 +556,6 @@ export function companyCardUsable(s: GameState, id: CompanyCardId): boolean {
   if (overBudget(s, companyCardCost(s, id))) return false
   if (def.target) return companyTargets(s, id).length > 0
   switch (id) {
-    case 'vulnscan':
-      return s.nodes.some((n) => (isMachine(n) || n.kind === 'ai') && unknownSlots(n).length > 0)
     case 'intel':
       // 駭客露出夠多痕跡（警戒值夠高）才查得到他的目的
       return !co.missionKnown && s.alert >= COMPANY.intelAlert
@@ -573,6 +569,8 @@ export function companyCardUsable(s: GameState, id: CompanyCardId): boolean {
       return s.alert < MAX_ALERT
     case 'execCoach':
       return canDraw(s) && s.nodes.some((n) => hireOf(n) === 'exec' && !n.controlled)
+    case 'training':
+      return !co.trainingNext && s.nodes.some(isPerson)
     default:
       return true
   }
@@ -632,6 +630,36 @@ function renew(s: GameState, n: GameNode, tier: Tier) {
   })
 }
 
+/** 這張牌會不會被教育訓練放大：教育訓練生效中，而且它修的是員工會有的弱點 */
+export function trainingBoosts(s: GameState, id: CompanyCardId): boolean {
+  if (!s.company?.trainingNext) return false
+  if (id === 'reminder') return true
+  const v = FIX_VULN[id]
+  return !!v && (VULNS[v].kinds?.includes('employee') ?? VULNS[v].kind === 'employee')
+}
+
+/** 教育訓練：目標那一層的所有員工（加上目標本身）一起修這個弱點，沒發現的也修好；員工下回合沒有產值 */
+function trainLayer(s: GameState, t: GameNode, v: VulnId, eff: CompanyEffect) {
+  s.company!.trainingNext = false
+  const group = s.nodes.filter((n) => n === t || (n.layer === t.layer && isPerson(n)))
+  for (const n of group) {
+    if (isPerson(n)) n.training = true
+    const idx = n.slots.findIndex((sl) => sl.vuln === v && !sl.shield && !sl.fixed)
+    if (idx >= 0) {
+      n.slots[idx].shield = true
+      n.slots[idx].known = true
+      eff.fixed.push({ node: n.id, idx })
+    } else {
+      n.cleared = [...(n.cleared ?? []), v]
+    }
+  }
+  const people = group.filter(isPerson).length
+  eff.ok = eff.fixed.length > 0
+  eff.message = eff.ok
+    ? `${LAYER_NAMES[t.layer]} ${people} 位員工受訓，修好 ${eff.fixed.length} 個「${VULNS[v].name}」`
+    : `${LAYER_NAMES[t.layer]}沒有人有「${VULNS[v].name}」：大家白上了一堂課`
+}
+
 /** 公司出牌 */
 export function playCompanyCard(s: GameState, uid: number, targetId?: string): CompanyEffect {
   const co = s.company
@@ -644,7 +672,7 @@ export function playCompanyCard(s: GameState, uid: number, targetId?: string): C
   const t = targetId ? node(s, targetId) : null
   if (def.target && (!t || !companyTargets(s, id).includes(t.id))) throw new Error('這個目標不能用')
   const cost = companyCardCost(s, id)
-  co.spent += cost
+  co.assets -= cost
   const played = co.hand.splice(i, 1)
   const eff: CompanyEffect = { ok: true, card: id, target: t?.id ?? null, cost, revealed: [], fixed: [], recaptured: [], renewed: [], drawn: [], message: '' }
 
@@ -660,13 +688,6 @@ export function playCompanyCard(s: GameState, uid: number, targetId?: string): C
     case 'pentest':
       for (const idx of unknownSlots(t!)) revealForCompany(t!, idx, eff)
       break
-    case 'vulnscan':
-      for (const n of s.nodes) {
-        if (!(isMachine(n) || n.kind === 'ai')) continue
-        const u = unknownSlots(n)
-        if (u.length) revealForCompany(n, pick(s, u), eff)
-      }
-      break
     case 'intel':
       co.missionKnown = true
       break
@@ -678,8 +699,16 @@ export function playCompanyCard(s: GameState, uid: number, targetId?: string): C
       eff.fixed.push({ node: t!.id, idx })
       break
     }
-    case 'training': {
+    case 'training':
+      co.trainingNext = true
+      eff.message = '下一張修補員工弱點的牌，會對整層員工生效'
+      break
+    case 'reminder': {
       const idx = knownVulns(t!).sort((a, b) => severity(t!.slots[b].vuln) - severity(t!.slots[a].vuln))[0]
+      if (co.trainingNext) {
+        trainLayer(s, t!, t!.slots[idx].vuln, eff)
+        break
+      }
       t!.slots[idx].shield = true
       t!.training = true
       eff.fixed.push({ node: t!.id, idx })
@@ -688,6 +717,10 @@ export function playCompanyCard(s: GameState, uid: number, targetId?: string): C
     default: {
       const v = FIX_VULN[id]
       if (!v) break
+      if (trainingBoosts(s, id)) {
+        trainLayer(s, t!, v, eff)
+        break
+      }
       // 猜猜看：這個節點真的有這個弱點就修好（公司也就確認了）；沒有就白費，但公司記住它沒有
       const idx = t!.slots.findIndex((sl) => sl.vuln === v && !sl.shield && !sl.fixed)
       if (idx >= 0) {
@@ -735,7 +768,7 @@ export function playCompanyCard(s: GameState, uid: number, targetId?: string): C
       for (const idx of unknownSlots(t!)) revealForCompany(t!, idx, eff)
       break
     case 'overtime': {
-      co.bonus += COMPANY.overtimeBonus
+      co.assets += COMPANY.overtimeBonus
       // 過勞：隨機一位一般員工的一張防護變成蓋著的弱點
       const tired = s.nodes.filter((n) => hireOf(n) === 'staff' && n.slots.some((sl) => sl.shield))
       if (tired.length) {
@@ -753,7 +786,7 @@ export function playCompanyCard(s: GameState, uid: number, targetId?: string): C
       co.debts.push({ amount: COMPANY.investDebt, turns: COMPANY.investTurns })
       break
     case 'marketing': {
-      co.bonus += productionOf(s).gross
+      co.assets += productionOf(s).gross
       // 曝光的代價：駭客從公開資訊查到外圍一個還沒公開的弱點
       const leaks = s.nodes
         .filter((n) => n.layer === 0)
@@ -769,7 +802,7 @@ export function playCompanyCard(s: GameState, uid: number, targetId?: string): C
       break
     }
     case 'promo':
-      co.bonus += COMPANY.promoBonus
+      co.assets += COMPANY.promoBonus
       s.alert = Math.max(0, s.alert - 1)
       break
     case 'insurance':
@@ -793,6 +826,7 @@ export function playCompanyCard(s: GameState, uid: number, targetId?: string): C
   co.discard.push(...played)
   if (eff.drawn.length) eff.message = `抽了 ${eff.drawn.length} 張牌`
   checkBlocked(s)
+  checkBankrupt(s)
   return eff
 }
 
@@ -823,19 +857,19 @@ export function companyPlayability(s: GameState, id: CompanyCardId): Playability
 export function companyDeadReason(s: GameState, id: CompanyCardId): string {
   const co = s.company!
   const cost = companyCardCost(s, id)
-  if (overBudget(s, cost)) return `錢不夠：打了這張牌，回合結束時資產會變成 ${co.assets + productionOf(s).net - cost}K`
+  if (overBudget(s, cost)) return `錢不夠：資產只剩 ${co.assets}K`
   switch (id) {
     case 'audit':
     case 'pentest':
       return '所有節點的牌都已經確認過了'
-    case 'vulnscan':
-      return '機器節點的牌都已經確認過了'
     case 'intel':
       return co.missionKnown ? '已經知道駭客的任務了' : `警戒值要到 ${COMPANY.intelAlert} 以上才查得到駭客的任務（目前 ${s.alert}）`
     case 'patch':
-      return '設備上還沒有已知的弱點：先稽核找出來'
-    case 'training':
+      return '設備和 AI 上還沒有已知的弱點：先稽核找出來'
+    case 'reminder':
       return '員工身上還沒有已知的弱點：先稽核找出來'
+    case 'training':
+      return s.company!.trainingNext ? '這回合已經安排教育訓練了' : '公司裡沒有員工'
     case 'aiReview':
       return 'AI 還沒有已知的弱點：先稽核找出來'
     case 'isolate':
@@ -883,7 +917,7 @@ function drawCompany(s: GameState, n: number): CompanyCardInst[] {
   return out
 }
 
-/** 換牌：花 10K，把一張手牌丟進棄牌堆、抽一張新的（成本一樣扣本回合營收） */
+/** 換牌：付錢把一張手牌丟進棄牌堆、抽一張新的（直接扣資產） */
 export function recycleCompanyCard(s: GameState, uid: number): CompanyCardInst | null {
   const co = s.company
   if (!co || s.phase !== 'company') return null
@@ -892,7 +926,7 @@ export function recycleCompanyCard(s: GameState, uid: number): CompanyCardInst |
   // 手牌滿了抽不到牌的回合，先用掉免費的換牌次數；錢不夠就不能付費換牌
   if (!co.freeSwaps && overBudget(s, COMPANY.recycleCost)) return null
   if (co.freeSwaps > 0) co.freeSwaps -= 1
-  else co.spent += COMPANY.recycleCost
+  else co.assets -= COMPANY.recycleCost
   const old = co.hand.splice(i, 1)[0]
   // 先抽再丟，避免牌堆見底時抽回同一張
   const fresh = drawCompany(s, 1)[0] ?? null
@@ -909,11 +943,17 @@ export function companyDrawCount(s: GameState): number {
   return s.company!.drawPerTurn
 }
 
-/** 駭客回合結束後，輪到公司 */
+/** 駭客回合結束後，輪到公司：先照目前有在運作的節點把營收入帳，再抽牌 */
 export function startCompanyTurn(s: GameState): CompanyCardInst[] {
   const co = s.company!
   co.turn += 1
   s.phase = 'company'
+  // 入帳：上回合受訓、這段時間被隔離或癱瘓的節點，這次就沒有產值
+  co.income = productionOf(s).net
+  co.assets += co.income
+  for (const d of co.debts) d.turns -= 1
+  co.debts = co.debts.filter((d) => d.turns > 0)
+  for (const n of s.nodes) n.training = false
   // 隔離倒數：時間到就恢復連線，同一個節點要隔一回合才能再隔離
   for (const n of s.nodes) {
     if (!n.isolated) continue
@@ -923,13 +963,33 @@ export function startCompanyTurn(s: GameState): CompanyCardInst[] {
     n.isolateReady = co.turn + 1
   }
   co.freeSwaps = 0
-  // 起手牌在開局時就抽了
-  if (co.turn === 1) return []
-  const want = companyDrawCount(s)
+  // 起手牌在開局時就抽了，第 1 回合不再抽
+  const want = co.turn === 1 ? 0 : companyDrawCount(s)
   const drew = drawCompany(s, want)
   // 手牌滿了、一張都沒抽到：這回合給免費換牌，卡住的牌才換得掉（有抽到一張就不算）
   if (want > 0 && drew.length === 0 && co.hand.length >= COMPANY.handMax) co.freeSwaps = COMPANY.fullHandSwaps
+  // 抽完牌再看：入帳後資產是負的、手上又沒有能救的牌就破產
+  checkBankrupt(s)
   return drew
+}
+
+/** 能讓公司加錢的牌（都是免費的經營牌） */
+const EARNERS: CompanyCardId[] = ['overtime', 'invest', 'marketing', 'promo']
+
+/** 破產：入帳後資產是負的，而且手上沒有能加錢的牌可以救，不用等回合結束 */
+export function checkBankrupt(s: GameState): boolean {
+  const co = s.company
+  if (!co || co.outcome || s.phase !== 'company') return false
+  if (co.assets >= 0) return false
+  if (co.hand.some((c) => EARNERS.includes(c.id) && canPlayCompany(s, c.id))) return false
+  goBankrupt(s)
+  return true
+}
+
+function goBankrupt(s: GameState) {
+  s.company!.outcome = 'bankrupt'
+  s.phase = 'over'
+  s.result = 'win'
 }
 
 /** 完美防禦的進度：所有牌都確認過、沒有有效弱點、沒有節點被控制 */
@@ -956,24 +1016,18 @@ export function syncOutcome(s: GameState) {
 }
 
 export interface CompanyTurnEnd {
-  net: number
   outcome: CompanyState['outcome']
 }
 
-/** 公司回合結束：營收加進資產，判定完美防禦，然後輪到駭客 */
+/** 公司回合結束：判定破產與完美防禦，然後輪到駭客（錢在下回合開始時才入帳） */
 export function endCompanyTurn(s: GameState): CompanyTurnEnd {
   const co = s.company!
-  const p = productionOf(s)
-  // 錢不夠的牌打不出去；節點停工、還款讓營收變負時，資產最低就是 0，不會破產
-  co.assets = Math.max(0, co.assets + p.net)
-  // 這回合的出牌與加班都已經算進資產，帳面歸零
-  co.spent = 0
-  co.bonus = 0
-  for (const d of co.debts) d.turns -= 1
-  co.debts = co.debts.filter((d) => d.turns > 0)
-  for (const n of s.nodes) n.training = false
-  co.perfectStreak = p.net > 0 && defenseProgress(s).perfect ? co.perfectStreak + 1 : 0
-  if (co.perfectStreak >= COMPANY.perfectTurns) {
+  co.trainingNext = false
+  co.perfectStreak = co.income > 0 && defenseProgress(s).perfect ? co.perfectStreak + 1 : 0
+  // 入帳後資產是負的、這回合又沒有用賺錢的牌救回來：破產
+  if (co.assets < 0) {
+    goBankrupt(s)
+  } else if (co.perfectStreak >= COMPANY.perfectTurns) {
     co.outcome = 'perfect'
     s.phase = 'over'
     s.result = 'lose'
@@ -981,7 +1035,7 @@ export function endCompanyTurn(s: GameState): CompanyTurnEnd {
   } else if (!checkBlocked(s)) {
     startHackerTurn(s)
   }
-  return { net: p.net, outcome: co.outcome }
+  return { outcome: co.outcome }
 }
 
 /**
@@ -1005,6 +1059,7 @@ export const OUTCOME_TEXT: Record<NonNullable<CompanyState['outcome']>, { win: b
   caught: { win: true, title: '抓到駭客', text: '警戒值到 10，駭客的行蹤曝光了' },
   blocked: { win: true, title: '封死任務', text: '看穿了駭客的任務，也把所有入侵路線都堵死了' },
   breached: { win: false, title: '被駭客得手', text: '駭客完成了任務' },
+  bankrupt: { win: false, title: '破產', text: '資產變成負的，公司撐不下去了' },
 }
 
 export const vulnName = (v: VulnId) => VULNS[v].name

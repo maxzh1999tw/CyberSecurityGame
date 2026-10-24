@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 公司的牌（240 x 340）：和駭客的牌同一套紙卡材質，費用是金幣（扣本回合營收）
+// 公司的牌（240 x 340）：和駭客的牌同一套紙卡材質，費用是金幣（直接扣資產）
 import { computed } from 'vue'
 import { COMPANY_CARDS, COMPANY_CAT_NAME } from '../game/companyData'
 import type { CompanyCardId } from '../game/types'
@@ -10,6 +10,8 @@ const props = defineProps<{
   id: CompanyCardId
   cost?: number
   dead?: boolean
+  /** 教育訓練生效中：這張修補牌會對整層員工生效 */
+  boosted?: boolean
 }>()
 
 const def = computed(() => COMPANY_CARDS[props.id])
@@ -18,13 +20,14 @@ const discounted = computed(() => costShown.value < def.value.cost)
 </script>
 
 <template>
-  <div class="card" :class="['cat-' + def.cat, { dead }]">
+  <div class="card" :class="['cat-' + def.cat, { dead, boosted }]">
     <i class="frame"></i>
     <div class="art">
       <div class="pat"></div>
       <Icon :name="def.icon" :size="78" :stroke="1.6" class="art-icon" />
       <div class="gloss"></div>
       <div class="stage">{{ COMPANY_CAT_NAME[def.cat] }}</div>
+      <div v-if="boosted" class="boost" title="教育訓練生效中：這張牌會對整層員工生效"><Icon name="graduation-cap" :size="16" :stroke="2.6" />整層生效</div>
     </div>
     <div class="name">{{ def.name }}</div>
     <div class="body">
@@ -37,7 +40,7 @@ const discounted = computed(() => costShown.value < def.value.cost)
         <span class="txt"><RichText :text="def.effect" :size="14" /></span>
       </div>
     </div>
-    <div class="cost" :class="{ disc: discounted, zero: costShown === 0 }" :title="`成本 ${costShown}K（扣本回合營收）`">
+    <div class="cost" :class="{ disc: discounted, zero: costShown === 0 }" :title="`成本 ${costShown}K（直接扣資產）`">
       <span>{{ costShown }}<small v-if="costShown">K</small></span>
     </div>
     <div v-if="dead" class="dead-veil"></div>
@@ -135,6 +138,30 @@ const discounted = computed(() => costShown.value < def.value.cost)
   letter-spacing: 2px;
   color: var(--gold2);
   background: rgba(8, 12, 20, 0.62);
+}
+/* 教育訓練生效中：會被放大的修補牌 */
+.card.boosted {
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.35),
+    0 12px 24px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.6),
+    0 0 0 2px var(--gold3),
+    0 0 0 6px var(--gold);
+}
+.boost {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 9px;
+  border-radius: 0 0 0 10px;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #2a1e08;
+  background: linear-gradient(180deg, var(--gold2), var(--gold));
 }
 .name {
   position: absolute;

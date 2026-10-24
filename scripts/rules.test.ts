@@ -716,68 +716,33 @@ test('主管以權限核准取代行動點加成，一般員工仍各加一點',
   assert.equal(s.ap, s.apBase + 2)
 })
 
-test('主管只折扣擴散牌，失控即恢復原價，續控不疊加折扣', () => {
+test('主管受控：每張牌的噪音 −1（最低 0），費用不變；失控即恢復', () => {
   const s = world()
   control(s, 'boss')
-  for (const def of Object.values(CARDS)) {
-    assert.equal(cardCost(s, def.id), def.stage === '擴散' ? 1 : def.cost, def.id)
-  }
-  weakness(s, 'boss', 'curious')
-  play(s, 'phish', 'boss')
-  assert.equal(cardCost(s, 'usb'), 1)
-  assert.equal(apBonusOf(s), 0)
+  for (const def of Object.values(CARDS)) assert.equal(cardCost(s, def.id), def.cost, def.id)
+  weakness(s, 'sales', 'curious')
+  assert.equal(play(s, 'phish', 'sales').noise, Math.max(0, CARDS.phish.noise - 1))
   node(s, 'boss').controlled = false
-  for (const id of ['skill', 'usb', 'lateral'] as const) {
-    assert.equal(cardCost(s, id), CARDS[id].cost)
-    assert.equal(isFree(s, id), false)
-  }
+  weakness(s, 'engineer', 'curious')
+  assert.equal(play(s, 'phish', 'engineer').noise, CARDS.phish.noise)
 })
 
-test('主管折價後的費用、可負擔提示與實際出牌一致，噪音與分層規則不變', () => {
-  for (const id of ['skill', 'usb', 'lateral'] as const) {
-    const s = world('sabotage')
-    control(s, 'boss')
-    s.ap = 1
-    assert.equal(playability(s, id).cost, 1)
-    assert.equal(playability(s, id).affordable, true)
-    assert.equal(playability(s, id).free, false)
-    assert.equal(playability(s, id).status, 'sure')
-    assert.equal(reachKnown(s, node(s, 'it')), 'Y')
-    assert.notEqual(reachKnown(s, node(s, 'db')), 'Y', '主管本身仍不能越過內網直攻核心')
-    const result = play(s, id, id === 'lateral' ? 'boss' : undefined)
-    assert.equal(result.cost, 1)
-    assert.equal(result.effect.ok, true)
-    assert.equal(result.noise, CARDS[id].noise)
-    assert.equal(s.ap, 0)
-    if (id === 'lateral') assert.ok(result.effect.captured.every((target) => node(s, target).layer === 0))
-  }
+test('主管受控搭配沒人看紀錄：噪音先減半再 −1', () => {
+  const s = world()
+  weakness(s, 'infra', 'nolog')
+  control(s, 'boss')
+  weakness(s, 'sales', 'curious')
+  assert.equal(play(s, 'phish', 'sales').noise, Math.max(0, Math.ceil(CARDS.phish.noise / 2) - 1))
 })
 
-test('主管折價可搭配 AI 單次免費額度，重複控制不重發免費機會', () => {
-  for (const id of ['skill', 'usb', 'lateral'] as const) {
-    const s = world('sabotage')
-    control(s, 'boss')
-    control(s, 'ai')
-    s.freePlayReady = true
-    s.ap = 0
-    assert.equal(cardCost(s, id), 0)
-    assert.equal(playability(s, id).free, true)
-    assert.equal(playability(s, id).affordable, true)
-    const result = play(s, id, id === 'lateral' ? 'boss' : undefined)
-    assert.equal(result.free, true)
-    assert.equal(result.cost, 0)
-    assert.equal(s.freePlayReady, false)
-    assert.equal(cardCost(s, 'usb'), 1)
-    s.ap = 10
-    weakness(s, 'boss', 'curious')
-    play(s, 'phish', 'boss')
-    assert.equal(s.freePlayReady, false)
-    assert.equal(cardCost(s, 'usb'), 1)
-    node(s, 'boss').controlled = false
-    s.freePlayReady = true
-    assert.equal(cardCost(s, 'usb'), 2, '失去主管後，AI 不能免費打原價二點的擴散牌')
-    assert.equal(isFree(s, 'social'), true, 'AI 的一般一點牌免費能力保留')
-  }
+test('主管不再讓擴散牌變便宜：AI 的免費額度只給原價一點的牌', () => {
+  const s = world('sabotage')
+  control(s, 'boss')
+  control(s, 'ai')
+  s.freePlayReady = true
+  assert.equal(cardCost(s, 'usb'), CARDS.usb.cost)
+  assert.equal(isFree(s, 'usb'), CARDS.usb.cost === 1)
+  assert.equal(isFree(s, 'social'), true, 'AI 的一般一點牌免費能力保留')
 })
 
 test('橫向移動依畫面向下擴散：內網只能選內網或外圍，不能選核心', () => {
@@ -1492,7 +1457,7 @@ test('兩套基礎設施：入侵牌指定其中一個，任一受控即滿足�
   assert.equal(play(s, 'wreck', 'ot').win, true)
 })
 
-test('任一基礎設施的規則類弱點都對整間公司生效；中斷任何一套都暫停公司應變', () => {
+test('任一基礎設施的規則類弱點都對整間公司生效；所有基礎設施都中斷才暫停公司應變', () => {
   const s = companyWorld('factory')
   weakness(s, 'ot', 'nolog')
   weakness(s, 'sales', 'weakpw')
@@ -1508,6 +1473,9 @@ test('任一基礎設施的規則類弱點都對整間公司生效；中斷任�
   const down = companyWorld('factory')
   control(down, 'sales')
   node(down, 'ot').paralyzed = 2
+  assert.equal(repairBlock(down), null, '還有一套基礎設施活著，照常修復')
+  assert.equal(recaptureBlock(down), null)
+  node(down, 'infra').paralyzed = 3
   assert.equal(repairBlock(down), 'infraParalyzed')
   assert.equal(recaptureBlock(down), 'infraParalyzed')
   const steps = Array.from(endOfTurn(down))

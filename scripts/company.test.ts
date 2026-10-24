@@ -18,6 +18,7 @@ import {
   moveTo,
   newDraft,
   openErrors,
+  OUTCOME_TEXT,
   playCompanyCard,
   productionOf,
   recycleCompanyCard,
@@ -157,26 +158,75 @@ test('經濟：基礎設施被癱瘓不影響其他節點的產值；主管帶�
   assert.equal(productionOf(s).lead >= Math.min(COMPANY.leadMax, staffSameLayer), true)
 })
 
-test('出牌：成本扣本回合營收，可以扣成負的；錢不夠的牌不能打；資產最低 0，不會破產', () => {
+test('出牌：直接扣資產；付不起牌價的牌不能打；免費的賺錢牌照樣能打', () => {
   const s = companyTurn()
   const co = s.company!
-  const net = productionOf(s).net
   const cost = COMPANY_CARDS.pentest.cost
-  co.assets = cost - net
-  const uid = give(s, 'pentest')
-  playCompanyCard(s, uid, companyTargets(s, 'pentest')[0])
-  assert.ok(productionOf(s).net < net, '營收可以扣成負的')
-  assert.equal(co.assets + productionOf(s).net, 0, '剛好花光')
+  co.assets = cost
+  playCompanyCard(s, give(s, 'pentest'), companyTargets(s, 'pentest')[0])
+  assert.equal(co.assets, 0, '剛好花光')
   give(s, 'pentest')
   assert.equal(canPlayCompany(s, 'pentest'), false, '錢不夠：不能打')
   assert.match(companyDeadReason(s, 'pentest'), /錢不夠/)
   assert.equal(canPlayCompany(s, 'promo'), true, '賺錢的牌免費，照樣能打')
-  // 營收因為停工、還款變成負的：資產停在 0，遊戲繼續
-  co.spent += 999
-  const end = endCompanyTurn(s)
-  assert.equal(co.assets, 0)
-  assert.equal(end.outcome, null)
-  assert.notEqual(s.phase, 'over')
+  playCompanyCard(s, give(s, 'promo'))
+  assert.equal(co.assets, COMPANY.promoBonus, '賺的錢立刻進資產')
+})
+
+test('回合開始入帳：資產加上每回合營收；上回合受訓的人這次沒有產值，入帳後照常上班', () => {
+  const s = companyTurn()
+  const co = s.company!
+  co.assets = 500
+  const staff = first(s, 'staff')
+  staff.slots = [{ vuln: 'curious', shield: false, vis: 2, fixed: false }]
+  const full = productionOf(s).net
+  playCompanyCard(s, give(s, 'reminder'), staff.id)
+  const assets = co.assets
+  const expected = productionOf(s).net
+  assert.ok(expected < full, '受訓的人下回合沒有產值')
+  endCompanyTurn(s)
+  assert.equal(co.assets, assets, '回合結束不結算')
+  startCompanyTurn(s)
+  assert.equal(co.income, expected)
+  assert.equal(co.assets, assets + expected)
+  assert.equal(staff.training, false, '入帳後照常上班')
+  assert.equal(productionOf(s).net, full)
+})
+
+/** 入帳後資產會是 −10K 的局面（用一筆大額還款壓低營收） */
+function brokeAfterIncome() {
+  const s = companyTurn()
+  const co = s.company!
+  co.assets = 10
+  co.debts.push({ amount: 20 + productionOf(s).net, turns: 1 })
+  return s
+}
+
+test('破產：入帳後資產是負的、手上又沒有能賺錢的牌，回合一開始就破產', () => {
+  const s = brokeAfterIncome()
+  endCompanyTurn(s)
+  startCompanyTurn(s)
+  assert.equal(s.company!.assets, -10)
+  assert.equal(s.company!.outcome, 'bankrupt')
+  assert.equal(s.phase, 'over')
+  assert.equal(OUTCOME_TEXT.bankrupt.win, false)
+})
+
+test('破產：手上有能賺錢的牌可以先救；救回來就繼續，沒救就在結束回合時破產', () => {
+  const saved = brokeAfterIncome()
+  const promo = give(saved, 'promo')
+  endCompanyTurn(saved)
+  startCompanyTurn(saved)
+  assert.equal(saved.company!.outcome, null, '還有限時特惠可以救')
+  playCompanyCard(saved, promo)
+  assert.equal(saved.company!.assets, COMPANY.promoBonus - 10)
+  assert.equal(endCompanyTurn(saved).outcome, null)
+  const lazy = brokeAfterIncome()
+  give(lazy, 'promo')
+  endCompanyTurn(lazy)
+  startCompanyTurn(lazy)
+  assert.equal(lazy.company!.outcome, null)
+  assert.equal(endCompanyTurn(lazy).outcome, 'bankrupt', '沒救就結束回合：破產')
 })
 
 test('內部稽核：節點還藏著弱點時，一定先揭露弱點，不會翻到防護', () => {
@@ -203,19 +253,6 @@ test('內部稽核：節點還藏著弱點時，一定先揭露弱點，不會�
   assert.equal(t.slots[0].known, true)
 })
 
-test('公司回合結束：出牌花費併入資產後歸零，不會留到駭客回合', () => {
-  const s = companyTurn()
-  const co = s.company!
-  co.assets = 500
-  playCompanyCard(s, give(s, 'pentest'), companyTargets(s, 'pentest')[0])
-  assert.ok(co.spent > 0)
-  const expected = co.assets + productionOf(s).net
-  endCompanyTurn(s)
-  assert.equal(co.assets, expected)
-  assert.equal(co.spent, 0)
-  assert.equal(co.bonus, 0)
-})
-
 test('牌的費用就是牌上的價錢：IT 在不在都一樣', () => {
   const s = companyTurn()
   assert.equal(companyCardCost(s, 'pentest'), COMPANY_CARDS.pentest.cost)
@@ -235,14 +272,14 @@ test('稽核只讓公司知道，駭客看不到；修補要先知道弱點', ()
   assert.equal(db.slots[0].fixed, true)
 })
 
-test('教育訓練：弱點變防護、這回合停工；換人與升級會清掉駭客的控制', () => {
+test('日常提醒：弱點變防護、下回合沒有產值；換人與升級會清掉駭客的控制', () => {
   const s = companyTurn()
   const staff = first(s, 'staff')
   staff.slots = [{ vuln: 'curious', shield: false, vis: 2, fixed: false }]
   const gross = productionOf(s).gross
-  playCompanyCard(s, give(s, 'training'), staff.id)
+  playCompanyCard(s, give(s, 'reminder'), staff.id)
   assert.equal(staff.slots[0].shield, true)
-  assert.ok(productionOf(s).gross < gross, '受訓這回合停工')
+  assert.ok(productionOf(s).gross < gross, '受訓的人下回合入帳時沒有產值')
   const infra = first(s, 'infra')
   infra.controlled = true
   infra.econ!.tier = 1
@@ -250,6 +287,43 @@ test('教育訓練：弱點變防護、這回合停工；換人與升級會清�
   assert.equal(infra.controlled, false)
   assert.equal(infra.econ!.tier, 2)
   assert.ok(infra.slots.every((sl) => sl.vis === 0 && !sl.known), '新設備的牌又是未知的')
+})
+
+test('教育訓練：下一張修補員工弱點的牌對同一層所有員工生效，沒發現的也修好；整層下回合沒有產值', () => {
+  const s = companyTurn()
+  const staff = first(s, 'staff')
+  const layer = s.nodes.filter((n) => n.layer === staff.layer && n.kind === 'employee')
+  const others = s.nodes.filter((n) => n.layer !== staff.layer && n.kind === 'employee')
+  assert.ok(layer.length >= 2)
+  // 目標以外的人：一半有沒發現的「好騙」，一半沒有
+  layer.forEach((n, i) => (n.slots = [{ vuln: i % 2 === 0 ? 'gullible' : 'curious', shield: false, vis: 0, fixed: false }]))
+  for (const n of others) n.slots = [{ vuln: 'gullible', shield: false, vis: 0, fixed: false }]
+  assert.equal(companyCardCost(s, 'training'), 0, '教育訓練免費')
+  playCompanyCard(s, give(s, 'training'))
+  assert.equal(s.company!.trainingNext, true)
+  assert.equal(canPlayCompany(s, 'training'), false, '一回合只能安排一次')
+  playCompanyCard(s, give(s, 'fixGullible'), staff.id)
+  assert.equal(s.company!.trainingNext, false, '只放大下一張')
+  layer.forEach((n, i) => {
+    assert.equal(n.slots[0].shield, i % 2 === 0, n.name)
+    assert.equal(n.training, true, '整層都去上課')
+  })
+  for (const n of others) {
+    assert.equal(n.slots[0].shield, false, '別層的人不受影響')
+    assert.ok(!n.training)
+  }
+  endCompanyTurn(s)
+  startCompanyTurn(s)
+  assert.ok(layer.every((n) => !n.training), '下回合入帳後照常上班')
+})
+
+test('修補漏洞也能修 AI 的已知弱點', () => {
+  const s = companyTurn()
+  const ai = first(s, 'ai')
+  ai.slots = [{ vuln: ai.slots.find((sl) => sl.vuln)!.vuln, shield: false, vis: 2, fixed: false }]
+  assert.ok(companyTargets(s, 'patch').includes(ai.id))
+  playCompanyCard(s, give(s, 'patch'), ai.id)
+  assert.equal(ai.slots[0].fixed, true)
 })
 
 test('隔離：駭客 2 回合不能對它出牌，之後恢復；解除後要隔一回合才能再隔離', () => {
@@ -318,17 +392,18 @@ test('公司模式：被控制的節點會倒數奪回（也能出牌立刻奪�
   assert.equal(other.controlled, false, '出牌立刻奪回')
 })
 
-test('完美防禦：全部確認過、沒有弱點、沒有被控制、本回合有盈餘', () => {
+test('完美防禦：全部確認過、沒有弱點、沒有被控制、這回合入帳的營收是正的', () => {
   const s = companyTurn()
   for (const n of s.nodes) for (const sl of n.slots) Object.assign(sl, { shield: true, known: true })
   assert.equal(defenseProgress(s).perfect, true)
   s.nodes[0].slots[0].known = false
   assert.equal(defenseProgress(s).perfect, false, '沒確認過的牌不算')
   s.nodes[0].slots[0].known = true
-  s.company!.spent = 999
+  s.company!.income = 0
   assert.notEqual(endCompanyTurn(s).outcome, 'perfect', '沒有盈餘不算')
   const t = companyTurn()
   for (const n of t.nodes) for (const sl of n.slots) Object.assign(sl, { shield: true, known: true })
+  t.company!.income = 10
   assert.equal(endCompanyTurn(t).outcome, 'perfect')
 })
 
@@ -344,10 +419,10 @@ test('威脅情資：警戒值 6 以上才能打', () => {
 test('換牌：花錢把一張手牌換成新的', () => {
   const s = companyTurn()
   const uid = give(s, 'intel')
-  const spent = s.company!.spent
+  const assets = s.company!.assets
   const fresh = recycleCompanyCard(s, uid)
   assert.ok(fresh)
-  assert.equal(s.company!.spent, spent + COMPANY.recycleCost)
+  assert.equal(s.company!.assets, assets - COMPANY.recycleCost)
   assert.ok(!s.company!.hand.some((c) => c.uid === uid))
 })
 
@@ -480,11 +555,12 @@ test('手牌滿了抽不到牌：這回合可以免費換牌 2 次，用完才�
   s.phase = 'hacker'
   assert.equal(startCompanyTurn(s).length, 0)
   assert.equal(co.freeSwaps, COMPANY.fullHandSwaps)
+  const assets = co.assets
   recycleCompanyCard(s, co.hand[0].uid)
   recycleCompanyCard(s, co.hand[1].uid)
-  assert.equal(co.spent, 0, '前兩次免費')
+  assert.equal(co.assets, assets, '前兩次免費')
   recycleCompanyCard(s, co.hand[2].uid)
-  assert.equal(co.spent, COMPANY.recycleCost)
+  assert.equal(co.assets, assets - COMPANY.recycleCost)
   // 下一回合手牌沒滿：沒有免費換牌
   co.hand.splice(0, 3)
   s.phase = 'hacker'

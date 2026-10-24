@@ -56,7 +56,7 @@ const COMPANY_STEPS: Step[] = [
   },
   {
     target: () => anchorRect('money'),
-    text: '公司的錢在這裡。回合結束時，產值扣掉薪水和這回合出牌的花費，就是這回合的營收。',
+    text: '公司的錢在這裡。每回合開始時，產值扣掉薪水會先入帳；出牌就直接從這裡扣錢。',
     side: 'right',
   },
   {

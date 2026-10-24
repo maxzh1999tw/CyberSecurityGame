@@ -2,8 +2,9 @@
 // 手牌：扇形排列，滑過放大，按住拖曳出牌（駭客牌與公司牌共用）
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { sfx } from '../audio/sfx'
+import { trainingBoosts } from '../game/company'
 import { CARDS } from '../game/data'
-import { knownHas, noLogs } from '../game/engine'
+import { knownHas, noiseOf, noLogs } from '../game/engine'
 import type { Playability } from '../game/engine'
 import {
   anchorRect,
@@ -365,7 +366,13 @@ onBeforeUnmount(() => {
       @pointerdown.prevent="onCardPointerDown(sl.c.uid, $event)"
     >
       <div class="aura"></div>
-      <CompanyCardFace v-if="company" :id="sl.c.id as CompanyCardId" :cost="sl.pb.cost" :dead="sl.pb.status === 'dead'" />
+      <CompanyCardFace
+        v-if="company"
+        :id="sl.c.id as CompanyCardId"
+        :cost="sl.pb.cost"
+        :dead="sl.pb.status === 'dead'"
+        :boosted="trainingBoosts(s, sl.c.id as CompanyCardId)"
+      />
       <template v-else>
         <CardFace
           :id="sl.c.id as CardId"
@@ -373,7 +380,7 @@ onBeforeUnmount(() => {
           :free="sl.pb.free"
           :unaffordable="!sl.pb.affordable"
           :dead="sl.pb.status === 'dead'"
-          :noise="nolog ? Math.ceil(CARDS[sl.c.id as CardId].noise / 2) : undefined"
+          :noise="noiseOf(s, CARDS[sl.c.id as CardId].noise, knownHas)"
           :noise-halved="nolog"
         />
         <CardTip v-if="ui.hoverCard === sl.c.uid && !ui.drag && !previewUid" />

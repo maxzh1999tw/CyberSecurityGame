@@ -193,12 +193,11 @@ function buildGreedy(d: DraftState) {
 export function botCompanyTurn(s: GameState, play: (uid: number, target?: string) => void) {
   const co = s.company!
   for (let guard = 0; guard < 20; guard++) {
-    const net = productionOf(s).net
     const options: Array<{ uid: number; target?: string; score: number }> = []
     for (const c of co.hand) {
       if (!canPlayCompany(s, c.id)) continue
       const cost = companyCardCost(s, c.id)
-      const after = co.assets + net - cost
+      const after = co.assets - cost
       for (const target of COMPANY_CARDS[c.id].target ? companyTargets(s, c.id) : [undefined]) {
         const score = cardScore(s, c.id, target, after)
         if (score > 0) options.push({ uid: c.uid, target, score })
@@ -208,7 +207,7 @@ export function botCompanyTurn(s: GameState, play: (uid: number, target?: string
       // 有節點被控制卻沒有應變牌：花錢換牌找奪回控制
       const urgent = s.nodes.some((n) => n.controlled)
       const junk = co.hand.find((c) => !canPlayCompany(s, c.id) || c.id === 'isolate' || c.id === 'replace' || c.id === 'upgrade')
-      if (junk && (co.freeSwaps > 0 || co.assets + net - COMPANY.recycleCost >= (urgent ? 20 : 60))) {
+      if (junk && (co.freeSwaps > 0 || co.assets - COMPANY.recycleCost >= (urgent ? 20 : 60))) {
         recycleCompanyCard(s, junk.uid)
         continue
       }
@@ -235,14 +234,12 @@ function cardScore(s: GameState, id: CompanyCardId, target: string | undefined, 
     case 'patch':
     case 'aiReview':
       return safe ? 60 + (t?.layer ?? 0) * 3 : 0
-    case 'training':
+    case 'reminder':
       return safe && t && knownVulns(t).length ? 55 : 0
     case 'pentest':
       return after >= 40 && t ? 40 + t.slots.length : 0
     case 'audit':
       return safe && t ? 45 + t.layer * 2 : 0
-    case 'vulnscan':
-      return safe ? 42 : 0
     case 'overtime':
       return productionOf(s).net < 10 ? 70 : 0
     case 'invest':

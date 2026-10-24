@@ -1,6 +1,6 @@
 // 電腦駭客：每一步挑分數最高的牌（模擬器、公司模式的對手共用）
 import { CARDS } from './data.ts'
-import { HAND_MAX, cardCost, node, playability, recaptureSpeedOf } from './engine.ts'
+import { HAND_MAX, cardCost, node, noiseOf, playability, recaptureSpeedOf } from './engine.ts'
 import type { CardId, GameState } from './types.ts'
 
 export interface Choice {
@@ -28,7 +28,7 @@ export function bestChoice(s: GameState): Choice | null {
     for (const o of options) {
       if (s.ap < cardCost(s, c.id, o.target)) continue
       let sc = 0
-      const noise = def.noise
+      const noise = noiseOf(s, def.noise)
       const room = 9 - s.alert
       if (def.cat === 'finish') {
         sc = o.tri === 'Y' ? 1000 : 200

@@ -25,13 +25,14 @@ const s = computed(() => game.s)
             </div>
             <h3 class="sub win">獲勝方式</h3>
             <ul class="rules">
-              <li class="win"><Icon name="shield-check" :size="20" :stroke="2.4" /><span><b>完美防禦</b>所有牌都確認過、沒有弱點、沒有節點被控制，當回合還有盈餘</span></li>
+              <li class="win"><Icon name="shield-check" :size="20" :stroke="2.4" /><span><b>完美防禦</b>所有牌都確認過、沒有弱點、沒有節點被控制，這回合入帳的營收是正的</span></li>
               <li class="win"><Icon name="siren" :size="20" :stroke="2.4" /><span><b>抓到駭客</b>警戒值升到 10，駭客的行蹤就曝光了</span></li>
               <li class="win"><Icon name="brick-wall" :size="20" :stroke="2.4" /><span><b>封死任務</b>用威脅情資看穿任務，再把駭客能走的路都堵死</span></li>
             </ul>
             <h3 class="sub lose">落敗</h3>
             <ul class="rules">
               <li class="lose"><Icon name="flame" :size="20" :stroke="2.4" /><span><b>被得手</b>駭客完成他的任務</span></li>
+              <li class="lose"><Icon name="trending-down" :size="20" :stroke="2.4" /><span><b>破產</b>資產變成負的，公司破產倒閉</span></li>
             </ul>
           </article>
         </div>

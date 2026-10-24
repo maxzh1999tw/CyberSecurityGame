@@ -216,7 +216,7 @@ function leave() {
         v-if="company && n.econ?.value"
         class="econ"
         :class="{ idle: !producing }"
-        :title="producing ? `每回合產值 +${n.econ.value}K` : '這回合停工：沒有產值（成本照付）'"
+        :title="producing ? `每回合產值 +${n.econ.value}K` : '停工中：下回合入帳時沒有產值（成本照付）'"
       >
         <b class="v">+{{ n.econ.value }}K</b>
       </div>

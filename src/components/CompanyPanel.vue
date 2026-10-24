@@ -19,14 +19,19 @@ const speed = computed(() => speedOf(s.value))
 
 // 駭客模式每間公司只有一位 IT
 const it = computed(() => its(s.value)[0])
-// 任一套基礎設施中斷，公司就無法應變
-const downInfra = computed(() => infras(s.value).find((n) => n.paralyzed > 0) ?? null)
+// 所有基礎設施都中斷，公司才無法應變；最早恢復的那一套決定還要停幾回合
+const allInfra = computed(() => infras(s.value))
+const downInfra = computed(() =>
+  allInfra.value.length && allInfra.value.every((n) => n.paralyzed > 0)
+    ? [...allInfra.value].sort((a, b) => a.paralyzed - b.paralyzed)[0]
+    : null,
+)
 const blockState = computed(() => {
   if (downInfra.value) {
     return {
       tone: 'ice',
       icon: 'snowflake',
-      title: downInfra.value.name,
+      title: allInfra.value.length > 1 ? '所有基礎設施' : downInfra.value.name,
       text: `中斷中 ${downInfra.value.paralyzed} 回合`,
       sub: '修復與奪回暫停',
     }

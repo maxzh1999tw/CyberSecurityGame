@@ -307,11 +307,11 @@ export type CompanyCardId =
   // 稽核
   | 'audit'
   | 'pentest'
-  | 'vulnscan'
   | 'intel'
   // 修補與強化
   | 'patch'
   | 'training'
+  | 'reminder'
   | 'upgrade'
   | 'replace'
   | 'fixLegacy'
@@ -372,12 +372,10 @@ export interface CompanyBrand {
 export interface CompanyState {
   /** 公司名稱與 logo */
   brand: CompanyBrand
-  /** 資產（K）；最低 0 */
+  /** 資產（K）：每回合開始時營收入帳，出牌、換牌直接扣；變成負的就破產 */
   assets: number
-  /** 本回合已經花在牌上的成本 */
-  spent: number
-  /** 本回合額外收入（加班趕工等） */
-  bonus: number
+  /** 這回合開始時入帳的營收（完美防禦要它是正的） */
+  income: number
   hand: CompanyCardInst[]
   deck: CompanyCardInst[]
   discard: CompanyCardInst[]
@@ -392,7 +390,7 @@ export interface CompanyState {
   /** 拉攏投資的還款：每回合營收 −amount，還剩幾回合 */
   debts: Array<{ amount: number; turns: number }>
   /** 這局怎麼結束的 */
-  outcome: 'perfect' | 'caught' | 'blocked' | 'breached' | null
+  outcome: 'perfect' | 'caught' | 'blocked' | 'breached' | 'bankrupt' | null
   /** 駭客每回合多拿的行動點 */
   hackerAp: number
   /** 已經連續幾個公司回合結束時達成完美防禦 */
@@ -401,4 +399,6 @@ export interface CompanyState {
   drawPerTurn: number
   /** 這回合還剩幾次免費換牌（手牌滿了抽不到牌時給的補償） */
   freeSwaps: number
+  /** 教育訓練：這回合下一張修補員工弱點的牌，對目標那一層的所有員工生效 */
+  trainingNext: boolean
 }

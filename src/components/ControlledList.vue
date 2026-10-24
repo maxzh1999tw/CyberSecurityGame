@@ -21,7 +21,7 @@ const frozen = computed(() => recaptureBlock(s.value) !== null)
 const ABILITY: Record<string, { icon: string; text: string }> = {
   sales: { icon: 'zap', text: '+1 行動點' },
   engineer: { icon: 'zap', text: '+1 行動點' },
-  boss: { icon: 'crown', text: '擴散 −1 行動點' },
+  boss: { icon: 'crown', text: '每張牌噪音 −1' },
   chairman: { icon: 'hand-coins', text: '得手 −1 行動點' },
   it: { icon: 'wrench', text: '修復暫停' },
   infra: { icon: 'bug', text: '病毒' },

@@ -70,14 +70,15 @@ function playGame(seed: number, log?: string[]): GameState {
     if (s.phase === 'over') break
     // 公司回合
     startCompanyTurn(s)
+    if (s.phase === 'over') break
     botCompanyTurn(s, (uid, target) => {
       const id = s.company!.hand.find((c) => c.uid === uid)!.id
       const e = playCompanyCard(s, uid, target)
       log?.push(`T${s.turn} 公司 ${COMPANY_CARDS[id].name}${target ? '→' + target : ''} 花費=${e.cost}`)
     })
     const p = productionOf(s)
-    const end = endCompanyTurn(s)
-    log?.push(`T${s.turn} 公司結算 產值=${p.gross} 成本=${p.upkeep} 營收=${end.net} 資產=${s.company!.assets} 控制=${s.nodes.filter((n) => n.controlled).length}`)
+    endCompanyTurn(s)
+    log?.push(`T${s.turn} 公司回合結束 下回合產值=${p.gross} 成本=${p.upkeep} 這回合入帳=${s.company!.income} 資產=${s.company!.assets} 控制=${s.nodes.filter((n) => n.controlled).length}`)
   }
   return s
 }

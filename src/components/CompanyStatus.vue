@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 公司模式左欄：資產與本回合營收、完美防禦進度、駭客的任務（看見之前是問號）
+// 公司模式左欄：資產與下回合入帳的預估、完美防禦進度、駭客的任務（看見之前是問號）
 import { computed } from 'vue'
 import { defenseProgress, knownVulns, productionOf } from '../game/company'
 import { COMPANY } from '../game/companyData'
@@ -9,10 +9,11 @@ import Icon from './Icon.vue'
 
 const s = computed(() => game.s!)
 const co = computed(() => s.value.company!)
+// 下個公司回合開始時會入帳多少：照目前有在運作的節點算（停工、隔離、癱瘓的不算）
 const p = computed(() => productionOf(s.value))
-const after = computed(() => Math.max(0, co.value.assets + p.value.net))
-// 公司回合結束後，帳已經結清，面板改看下一個公司回合的預估
-const mine = computed(() => s.value.phase === 'company')
+const breakdown = computed(() =>
+  [`產值 +${p.value.gross}K`, `薪水與維護費 −${p.value.upkeep}K`, p.value.debt ? `投資還款 −${p.value.debt}K` : ''].filter(Boolean).join('、'),
+)
 const dp = computed(() => defenseProgress(s.value))
 const knownBad = computed(() => s.value.nodes.reduce((a, n) => a + knownVulns(n).length, 0))
 const mission = computed(() => MISSIONS[s.value.mission])
@@ -28,17 +29,9 @@ const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`)
     <section :ref="(el) => registerAnchor('money', el as HTMLElement | null)" class="opanel money">
       <div class="ohead"><span class="oic"><Icon name="piggy-bank" :size="17" :stroke="2.4" /></span>公司資產</div>
       <div class="big"><Icon name="coins" :size="34" :stroke="2" /><b :class="{ neg: co.assets < 0 }">{{ co.assets }}</b><span>K</span></div>
-      <ul class="rows">
-        <li><span>產值</span><b class="g">+{{ p.gross }}</b></li>
-        <li v-if="p.lead" class="sub"><span>主管加成</span><b>+{{ p.lead }}</b></li>
-        <li><span>薪水與維護費</span><b class="r">−{{ p.upkeep }}</b></li>
-        <li v-if="p.debt"><span>投資還款</span><b class="r">−{{ p.debt }}</b></li>
-        <li v-if="p.spent"><span>這回合出牌</span><b class="r">−{{ p.spent }}</b></li>
-        <li v-if="p.bonus"><span>額外收入</span><b class="g">+{{ p.bonus }}</b></li>
-        <li class="tot"><span>{{ mine ? '本回合營收' : '下回合營收' }}</span><b :class="p.net >= 0 ? 'g' : 'r'">{{ sign(p.net) }}</b></li>
-      </ul>
-      <div class="after">
-        {{ mine ? '回合結束後資產' : '下回合結束後資產' }} <b>{{ after }}</b>K
+      <!-- 這局結束了就不用再預估 -->
+      <div v-if="s.phase !== 'over'" class="after" :class="{ neg: p.net < 0 }" :title="breakdown">
+        下回合入帳 <b>{{ sign(p.net) }}</b>K
       </div>
     </section>
 
@@ -53,7 +46,7 @@ const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`)
         <li><span><Icon name="triangle-alert" :size="16" :stroke="2.4" />已知的弱點</span><b :class="{ r: knownBad }">{{ knownBad }}</b></li>
         <li><span><Icon name="skull" :size="16" :stroke="2.4" />被駭客控制</span><b :class="{ r: dp.controlled }">{{ dp.controlled }}</b></li>
       </ul>
-      <p class="hint">所有牌都確認過、沒有弱點、沒有節點被控制，而且當回合有盈餘，就贏了。</p>
+      <p class="hint">所有牌都確認過、沒有弱點、沒有節點被控制，而且這回合入帳的營收是正的，就贏了。</p>
     </section>
 
     <section class="opanel mis" :class="{ known: co.missionKnown }">
@@ -207,6 +200,15 @@ const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`)
   font-family: var(--font-num);
   font-size: 22px;
   color: #7a5310;
+}
+/* 下回合入帳是負的：資產會越來越少 */
+.after.neg {
+  color: #9b2c1f;
+  background: linear-gradient(180deg, #fbe9e5, #f5d3cc);
+  border-color: #e3a397;
+}
+.after.neg b {
+  color: #b42318;
 }
 .bar {
   height: 12px;
