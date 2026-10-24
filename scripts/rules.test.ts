@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { CARDS, MISSION_IDS, MISSIONS, SCENARIOS, SCENARIO_IDS, NODE_RISK, recaptureTurnsOf, repairTurnsOf, vulnPool } from '../src/game/data.ts'
 import {
-  HAND_MAX, OPENING_HAND, apBonusOf, backupUnavailable, canEndTurn, canHave, canRecon, canRecycle, cardCost, ctrlCount, dbAccess, drawCards, effective, endOfTurn, endTurn,
-  hintNodes, holdNeeded, isFree, isMissionCard, knownHas, newGame, startHackerTurn,
+  DRAW_PER_TURN, HAND_MAX, OPENING_HAND, apBonusOf, backupUnavailable, canEndTurn, canHave, canRecon, canRecycle, cardCost, ctrlCount, dbAccess, drawCards, effective, endOfTurn, endTurn,
+  freePlaysLeft, hintNodes, holdNeeded, isFree, isMissionCard, knownHas, newGame, noiseOf, startHackerTurn,
   node, playCard, playability, predict as enginePredict, reachKnown, recaptureBlock, recaptureSpeedOf, recycleCard, repairBlock, resolve, routeExists, speedOf, upcoming, uselessCards,
 } from '../src/game/engine.ts'
 import type { CardId, GameState, MissionId, NodeRole, ScenarioId, VulnId } from '../src/game/types.ts'
@@ -344,7 +344,7 @@ test('所有指定目標卡都排除未解鎖節點，拒絕出牌不消耗資�
         assert.ok(!(target.id in playability(s, card.id).targets))
         const inst = { uid: ++s.uidSeq, id: card.id }
         s.hand = [inst]
-        s.freePlayReady = true
+        s.freePlays = 1
         const before = JSON.stringify(s)
         assert.equal(resolve(s, card.id, target).ok, false)
         assert.equal(JSON.stringify(s), before, '直接結算也不能揭露或排除弱點')
@@ -716,12 +716,12 @@ test('主管以權限核准取代行動點加成，一般員工仍各加一點',
   assert.equal(s.ap, s.apBase + 2)
 })
 
-test('主管受控：每張牌的噪音 −1（最低 0），費用不變；失控即恢復', () => {
+test('主管受控：每張有噪音的牌噪音 −1（最低 1），費用不變；失控即恢復', () => {
   const s = world()
   control(s, 'boss')
   for (const def of Object.values(CARDS)) assert.equal(cardCost(s, def.id), def.cost, def.id)
   weakness(s, 'sales', 'curious')
-  assert.equal(play(s, 'phish', 'sales').noise, Math.max(0, CARDS.phish.noise - 1))
+  assert.equal(play(s, 'phish', 'sales').noise, CARDS.phish.noise > 0 ? Math.max(1, CARDS.phish.noise - 1) : 0)
   node(s, 'boss').controlled = false
   weakness(s, 'engineer', 'curious')
   assert.equal(play(s, 'phish', 'engineer').noise, CARDS.phish.noise)
@@ -732,14 +732,32 @@ test('主管受控搭配沒人看紀錄：噪音先減半再 −1', () => {
   weakness(s, 'infra', 'nolog')
   control(s, 'boss')
   weakness(s, 'sales', 'curious')
-  assert.equal(play(s, 'phish', 'sales').noise, Math.max(0, Math.ceil(CARDS.phish.noise / 2) - 1))
+  assert.equal(play(s, 'phish', 'sales').noise, Math.max(1, Math.ceil(CARDS.phish.noise / 2) - 1))
+})
+
+test('被控制節點的能力會疊加：主管越多噪音越低（最低 1），備份越多抽越多', () => {
+  const s = world()
+  node(s, 'engineer').role = 'boss'
+  control(s, 'boss')
+  assert.equal(noiseOf(s, 3), 2)
+  control(s, 'engineer')
+  assert.equal(noiseOf(s, 3), 1, '兩位主管 −2')
+  assert.equal(noiseOf(s, 1), 1, '有噪音的牌最少還是 1')
+  assert.equal(noiseOf(s, 0), 0, '本來沒噪音的牌維持 0')
+  const b = world()
+  const extra = node(b, 'backup')
+  b.nodes.push({ ...JSON.parse(JSON.stringify(extra)), id: 'backup2' })
+  control(b, 'backup')
+  control(b, 'backup2')
+  b.hand = []
+  assert.equal(startHackerTurn(b).length, DRAW_PER_TURN + 2, '兩個備份各多抽 1 張')
 })
 
 test('主管不再讓擴散牌變便宜：AI 的免費額度只給原價一點的牌', () => {
   const s = world('sabotage')
   control(s, 'boss')
   control(s, 'ai')
-  s.freePlayReady = true
+  s.freePlays = 1
   assert.equal(cardCost(s, 'usb'), CARDS.usb.cost)
   assert.equal(isFree(s, 'usb'), CARDS.usb.cost === 1)
   assert.equal(isFree(s, 'social'), true, 'AI 的一般一點牌免費能力保留')
@@ -1266,10 +1284,10 @@ test('續控保留病毒與癱瘓狀態，且不重新給予 AI 當回合免費�
   assert.equal(node(s, 'backup').paralyzed, 3)
   control(s, 'ai')
   weakness(s, 'ai', 'obey')
-  s.freePlayReady = false
+  s.freePlays = 0
   s.alert = 0
   assert.deepEqual(play(s, 'inject').effect.extended, ['ai'])
-  assert.equal(s.freePlayReady, false)
+  assert.equal(s.freePlays, 0)
 })
 
 test('提示詞注入保留穩定控制權路線；拿到牌仍可能在尚未控制 IT 時盲打失敗', () => {
@@ -1425,15 +1443,24 @@ test('沒有 AI 的公司不會發 AI 牌；有兩個 AI 時要指定其中一�
   weakness(k, 'agent', 'masterkey')
   control(k, 'agent')
   assert.equal(reachKnown(k, node(k, 'db')), 'Y')
-  // 控制兩個 AI 也只有一次免費出牌
+  // 控制兩個 AI：每回合兩次免費出牌
   const f = companyWorld('startup')
   control(f, 'ai')
   control(f, 'agent')
   startHackerTurn(f)
-  assert.equal(f.freePlayReady, true)
+  assert.equal(f.freePlays, 2)
   assert.equal(isFree(f, 'scan'), true)
   play(f, 'scan')
+  assert.equal(isFree(f, 'scan'), true, '第二個 AI 的免費額度')
+  play(f, 'scan')
   assert.equal(isFree(f, 'scan'), false)
+  // 回合中被奪回的 AI，它的免費額度跟著消失
+  const g = companyWorld('startup')
+  control(g, 'ai')
+  control(g, 'agent')
+  startHackerTurn(g)
+  node(g, 'agent').controlled = false
+  assert.equal(freePlaysLeft(g), 1)
 })
 
 test('兩套基礎設施：入侵牌指定其中一個，任一受控即滿足「控制基礎設施」', () => {

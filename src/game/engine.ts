@@ -233,7 +233,10 @@ const nonItEmpCtrl = (s: GameState) => s.nodes.some((n) => isEmployee(n) && n.ro
 export const infraCtrl = (s: GameState) => infras(s).some((n) => n.controlled)
 export const aiCtrl = (s: GameState) => ais(s).some((n) => n.controlled)
 export const execCtrl = (s: GameState) => s.nodes.some((n) => isExec(n) && n.controlled)
-const roleCtrl = (s: GameState, role: GameNode['role']) => s.nodes.some((n) => n.role === role && n.controlled)
+/** 控制了幾個這種角色的節點：被控制節點的能力，控制幾個就疊加幾次 */
+const roleCtrlCount = (s: GameState, role: GameNode['role']) => s.nodes.filter((n) => n.role === role && n.controlled).length
+/** 控制了幾個 AI：每個 AI 每回合各給一次免費出牌 */
+export const aiCtrlCount = (s: GameState) => ais(s).filter((n) => n.controlled).length
 /** IT、資料庫、備份：公司模式可能各有好幾個；駭客模式各一個 */
 export const its = (s: GameState) => s.nodes.filter((n) => n.role === 'it')
 export const dbs = (s: GameState) => s.nodes.filter((n) => n.role === 'db')
@@ -554,16 +557,22 @@ export interface Playability {
   autoTri: Tri
 }
 
-/** 套用董事長的權限核准折扣後、尚未套用 AI 免費出牌前的費用。 */
+/** 套用董事長的權限核准折扣後（控制幾位就折幾點，最低 1）、尚未套用 AI 免費出牌前的費用。 */
 function beforeFree(s: GameState, id: CardId): number {
   const def = CARDS[id]
   let cost = def.cost
-  if (cost > 0 && def.stage === '得手' && roleCtrl(s, 'chairman')) cost = Math.max(1, cost - 1)
+  const chairmen = roleCtrlCount(s, 'chairman')
+  if (cost > 0 && def.stage === '得手' && chairmen) cost = Math.max(1, cost - chairmen)
   return cost
 }
 
+/** 這回合還能免費出幾張牌：回合開始時每控制一個 AI 給一次；中途被奪回的 AI 不再算 */
+export function freePlaysLeft(s: GameState): number {
+  return Math.min(s.freePlays, aiCtrlCount(s))
+}
+
 export function isFree(s: GameState, id: CardId): boolean {
-  return s.freePlayReady && aiCtrl(s) && beforeFree(s, id) === 1
+  return freePlaysLeft(s) > 0 && beforeFree(s, id) === 1
 }
 
 /** 實際費用；對已知是「社群分享狂」的員工用肉搜情報，費用 -1 */
@@ -978,7 +987,7 @@ export function playCard(s: GameState, uid: number, targetId?: string): PlayResu
   const knownDiscount = id === 'osint' && cost < def.cost && !free
   if (s.ap < cost) throw new Error('行動點不足')
   s.ap -= cost
-  if (free) s.freePlayReady = false
+  if (free) s.freePlays -= 1
   s.hand.splice(idx, 1)
   // 暗網情報要抽牌：先抽完再把自己放進棄牌堆，免得牌堆見底時又抽回自己
   const holdDiscard = id === 'darkweb'
@@ -1067,10 +1076,14 @@ export function noLogs(s: GameState, H: Has = trueHas): Tri {
   return or(...infras(s).map((i) => H(i, 'nolog')))
 }
 
-/** 實際噪音：沒人看紀錄減半；控制主管（他幫忙掩護）每張牌再 −1，最低 0 */
+/**
+ * 實際噪音：沒人看紀錄減半；每控制一位主管（他幫忙掩護）每張牌再 −1，
+ * 但有噪音的牌最少還是 1 點（本來就沒噪音的牌維持 0）
+ */
 export function noiseOf(s: GameState, base: number, H: Has = trueHas): number {
   const n = noLogs(s, H) === 'Y' ? Math.ceil(base / 2) : base
-  return n > 0 && roleCtrl(s, 'boss') ? n - 1 : n
+  const bosses = roleCtrlCount(s, 'boss')
+  return n > 0 && bosses ? Math.max(1, n - bosses) : n
 }
 
 function isFinisherOfMission(s: GameState, id: CardId): boolean {
@@ -1145,12 +1158,12 @@ export function startHackerTurn(s: GameState): CardInst[] {
   s.carryBoost = 0
   s.ap = s.apBase + s.apBonus + s.apCarry
   s.noiseThisTurn = 0
-  s.freePlayReady = aiCtrl(s)
+  s.freePlays = aiCtrlCount(s)
   s.phase = 'hacker'
-  // 任務牌已先放進手中，開局只補到 6 張；控制任一可用的備份，之後每回合多補 1 張。
+  // 任務牌已先放進手中，開局只補到 6 張；每控制一個可用的備份，之後每回合多補 1 張。
   const drawCount = s.turn === 1
     ? Math.max(0, OPENING_HAND - s.hand.length)
-    : DRAW_PER_TURN + (backups(s).some((b) => b.controlled && b.paralyzed === 0) ? 1 : 0)
+    : DRAW_PER_TURN + backups(s).filter((b) => b.controlled && b.paralyzed === 0).length
   return drawCards(s, drawCount)
 }
 
@@ -1717,7 +1730,7 @@ export function newGame(opts: NewGameOptions = {}): GameState {
     carryBoost: 0,
     alert: 0,
     noiseThisTurn: 0,
-    freePlayReady: false,
+    freePlays: 0,
     controlSeq: 0,
     hold: 0,
     phase: 'hacker',

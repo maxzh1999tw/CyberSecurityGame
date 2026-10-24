@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 下方：駭客頭像、行動點（左）／牌堆、結束回合（右）
 import { computed, nextTick, ref, watch } from 'vue'
-import { RECYCLE_COST, canEndTurn as engineCanEndTurn, canRecycle, isMissionCard } from '../game/engine'
+import { RECYCLE_COST, canEndTurn as engineCanEndTurn, canRecycle, freePlaysLeft, isMissionCard } from '../game/engine'
 import { boardCenter, endTurn, game, nodeRect, playerHasMoves, registerAnchor, ui, view } from '../game/store'
 import type { CardId } from '../game/types'
 import Icon from './Icon.vue'
@@ -95,7 +95,7 @@ watch(
           ></i>
         </div>
       </div>
-      <div v-if="s.freePlayReady" class="free"><Icon name="sparkles" :size="17" :stroke="2.4" />本回合 1 張免費</div>
+      <div v-if="freePlaysLeft(s)" class="free"><Icon name="sparkles" :size="17" :stroke="2.4" />本回合 {{ freePlaysLeft(s) }} 張免費</div>
     </div>
 
     <!-- 右下：換牌區與結束回合 -->

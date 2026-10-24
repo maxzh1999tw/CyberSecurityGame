@@ -285,7 +285,8 @@ export interface GameState {
   carryBoost: number
   alert: number
   noiseThisTurn: number
-  freePlayReady: boolean
+  /** 這回合還剩幾次免費出牌（回合開始時每控制一個 AI 給一次） */
+  freePlays: number
   controlSeq: number
   hold: number
   phase: 'hacker' | 'company' | 'over'

@@ -73,13 +73,13 @@ const pos = computed(() => {
 const ABILITY: Record<string, { icon: string; text: string }> = {
   sales: { icon: 'zap', text: '每回合 +1 行動點' },
   engineer: { icon: 'zap', text: '每回合 +1 行動點' },
-  boss: { icon: 'crown', text: '每張牌噪音 −1（最低 0）；可冒充老闆要求轉帳' },
+  boss: { icon: 'crown', text: '每張有噪音的牌噪音 −1（最低 1，控制幾位就疊加幾次）；可冒充老闆要求轉帳' },
   chairman: { icon: 'hand-coins', text: '得手牌費用 −1（最低 1）；可冒充老闆要求轉帳' },
   it: { icon: 'wrench', text: '公司的「修補」全部失效' },
   infra: { icon: 'bug', text: '再控制員工即可對它植入賽博病毒，每回合偷看 1 張' },
-  ai: { icon: 'sparkles', text: '每回合免費打出 1 張費用 1 的牌（控制多個 AI 不疊加）' },
+  ai: { icon: 'sparkles', text: '每回合可免費打出 1 張費用 1 的牌（控制幾個 AI 就有幾張）' },
   db: { icon: 'crown', text: '多數任務的關鍵' },
-  backup: { icon: 'database-backup', text: '阻礙系統奪回；未癱瘓時每回合多抽 1 張' },
+  backup: { icon: 'database-backup', text: '阻礙系統奪回；未癱瘓時每回合多抽 1 張（控制幾個就多抽幾張）' },
 }
 const abilityText = computed(() => {
   const n = node.value
