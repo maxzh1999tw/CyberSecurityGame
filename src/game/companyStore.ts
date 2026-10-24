@@ -32,6 +32,7 @@ import {
   coachSeen,
   commitPlay,
   companyApi,
+  dealFresh,
   finishGame,
   flashNode,
   flashSlot,
@@ -232,6 +233,10 @@ async function hackerBotTurn() {
     return
   }
   const drew = startCompanyTurn(s)
+  // 新抽的牌要在畫出來之前就標成新牌（先待在牌庫），不然會先閃一下出現在手牌裡
+  ui.freshCards = drew.map((c) => c.uid)
+  // 發牌和入帳演出同時開始：舊牌讓位後馬上補上新牌
+  const dealing = dealFresh()
   // 營收入帳：在公司資產上飄出這回合入帳多少
   const income = s.company!.income
   const money = anchorRect('money')
@@ -247,12 +252,11 @@ async function hackerBotTurn() {
     await finishGame()
     return
   }
-  ui.freshCards = drew.map((c) => c.uid)
   const swaps = s.company!.freeSwaps
-  await showBanner('公司回合', 'company', swaps ? `手牌滿了抽不到牌：這回合可以免費換牌 ${swaps} 次` : '拖曳手牌出牌，再按結束回合', swaps ? 1400 : 900)
-  ui.freshCards.forEach((_, i) => setTimeout(() => sfx.draw(), i * 110))
-  await wait(700)
-  ui.freshCards = []
+  await Promise.all([
+    showBanner('公司回合', 'company', swaps ? `手牌滿了抽不到牌：這回合可以免費換牌 ${swaps} 次` : '拖曳手牌出牌，再按結束回合', swaps ? 1400 : 900),
+    dealing,
+  ])
   ui.busy = false
   if (s.company!.turn === 1 && !coachSeen('company')) ui.coach = 0
 }

@@ -380,6 +380,24 @@ export function confirmIntro() {
   })()
 }
 
+/**
+ * 回合開始的發牌：新抽的牌要在畫出來之前就標成 freshCards（先待在牌庫），
+ * 原本的手牌往左讓位（約 .28 秒）之後，新牌就一張接一張飛進來。
+ */
+export async function dealFresh() {
+  const uids = [...ui.freshCards]
+  if (!uids.length) return
+  await wait(280)
+  uids.forEach((uid, i) =>
+    setTimeout(() => {
+      sfx.draw()
+      ui.freshCards = ui.freshCards.filter((u) => u !== uid)
+    }, i * 120),
+  )
+  await wait(uids.length * 120 + 300)
+  ui.freshCards = []
+}
+
 /** 第一次導覽看過了沒（駭客模式、公司模式、組建公司分開記） */
 export type CoachMode = 'hacker' | 'company' | 'recruit'
 export const coachKey = (mode: CoachMode) => (mode === 'hacker' ? 'csg-coach' : `csg-coach-${mode}`)
@@ -1077,10 +1095,8 @@ async function endTurnInner() {
   const drew = E.startHackerTurn(s)
   ui.freshCards = s.hand.filter((c) => !before.has(c.uid)).map((c) => c.uid)
   if (drew.length < E.DRAW_PER_TURN && s.hand.length >= E.HAND_MAX) toast(`手牌已滿 ${E.HAND_MAX} 張，這回合少抽了`)
-  await showBanner('你的回合', 'hacker', undefined, 700)
-  ui.freshCards.forEach((_, i) => setTimeout(() => sfx.draw(), i * 110))
-  await wait(700)
-  ui.freshCards = []
+  // 橫幅和發牌一起進行：舊牌讓位後馬上補上新牌，不用等橫幅播完
+  await Promise.all([showBanner('你的回合', 'hacker', undefined, 700), dealFresh()])
   ui.busy = false
 }
 
