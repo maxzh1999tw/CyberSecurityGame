@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   buildCompanyGame,
   canPlayCompany,
+  checkBlocked,
   companyDeadReason,
   companyCardCost,
   companyDrawCount,
@@ -590,19 +591,30 @@ test('手牌滿了抽不到牌：這回合可以免費換牌 2 次，用完才�
 })
 
 test('封死任務：看到駭客的任務、而且駭客怎麼打都不可能達成，公司在回合結束時獲勝', () => {
-  const sealAll = (s: GameState) => {
-    for (const n of s.nodes) for (const sl of n.slots) Object.assign(sl, { shield: true, known: false, vis: 0 })
+  const sealAll = (s: GameState, known: boolean) => {
+    for (const n of s.nodes) for (const sl of n.slots) Object.assign(sl, { shield: true, known, vis: 0 })
   }
   const blind = companyTurn()
-  sealAll(blind)
+  sealAll(blind, true)
   endCompanyTurn(blind)
   assert.equal(blind.company!.outcome, null, '沒看到任務就不算')
   const s = companyTurn()
-  sealAll(s)
+  sealAll(s, true)
   s.company!.missionKnown = true
   endCompanyTurn(s)
   assert.equal(s.company!.outcome, 'blocked')
   assert.equal(s.phase, 'over')
+})
+
+test('封死任務只看公司確認過的牌：還沒確認的防護一律當作弱點，確認了才算封死', () => {
+  const s = companyTurn()
+  for (const n of s.nodes) for (const sl of n.slots) Object.assign(sl, { shield: true, known: false, vis: 0 })
+  s.company!.missionKnown = true
+  assert.equal(checkBlocked(s), false, '其實全是防護，但公司還不知道')
+  assert.equal(s.company!.outcome, null)
+  for (const n of s.nodes) for (const sl of n.slots) sl.known = true
+  assert.equal(checkBlocked(s), true, '全部確認過，才看得出路都堵死了')
+  assert.equal(s.company!.outcome, 'blocked')
 })
 
 test('公司稽核到的弱點也會開始修補倒數，速度跟駭客模式一樣', () => {

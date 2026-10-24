@@ -1047,13 +1047,29 @@ export function endCompanyTurn(s: GameState): CompanyTurnEnd {
 }
 
 /**
- * 封死任務：公司已經看到駭客的任務，而且駭客不管怎麼打都不可能達成，公司當場獲勝。
+ * 公司眼中的局面：還沒確認的牌一律當作弱點（防護要稽核過才算數），
+ * 封死任務才是公司自己確認做到的，不會用到公司還不知道的資訊。
+ */
+function companyView(s: GameState): GameState {
+  const v = JSON.parse(JSON.stringify(s)) as GameState
+  for (const n of v.nodes) {
+    for (const sl of n.slots) {
+      if (companyKnows(sl)) continue
+      sl.shield = false
+      sl.fixed = false
+    }
+  }
+  return v
+}
+
+/**
+ * 封死任務：公司已經看到駭客的任務，而且就算還沒確認的牌全是弱點，駭客也不可能達成，公司當場獲勝。
  * 出牌補好弱點、看到任務、自動修補完成時都要檢查。
  */
 export function checkBlocked(s: GameState): boolean {
   const co = s.company
   if (!co || co.outcome || s.phase === 'over' || !co.missionKnown) return false
-  if (!isStuck(s)) return false
+  if (!isStuck(companyView(s))) return false
   co.outcome = 'blocked'
   s.phase = 'over'
   s.result = 'lose'
